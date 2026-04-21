@@ -206,6 +206,65 @@ tr.dept-row {
   cursor: pointer;
 }
 
+/* FAP Button Style */
+.fap-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #fbbf24; /* Amber-400 */
+    color: #92400e; /* Amber-900 */
+    padding: 0.6rem 1.2rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.3);
+    margin-top: 1rem;
+}
+
+.fap-btn:hover {
+    background: #f59e0b;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(251, 191, 36, 0.4);
+}
+
+.fap-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Error Banner Style */
+.error-banner {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    display: none;
+    animation: slideDown 0.3s ease-out;
+}
+
+.error-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.error-banner a {
+    color: #ef4444;
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
 /* Utility Animations */
 @keyframes fadeIn {
   from { opacity: 0; }

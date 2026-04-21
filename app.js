@@ -8,6 +8,7 @@ const groupList = document.getElementById('groupList');
 const previewSection = document.getElementById('previewSection');
 const previewTableBody = document.querySelector('#previewTable tbody');
 const downloadBtn = document.getElementById('downloadBtn');
+const errorBanner = document.getElementById('errorBanner');
 
 const CATEGORY_MAP = {
     'Frame': 'Frame',
@@ -38,16 +39,50 @@ dropZone.ondrop = (e) => {
 
 async function handleFile(file) {
     if (!file) return;
+    resetState();
+    
     const reader = new FileReader();
     reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        processRawData(json);
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            if (validatePattern(json)) {
+                processRawData(json);
+            } else {
+                showError();
+            }
+        } catch (err) {
+            console.error(err);
+            showError();
+        }
     };
     reader.readAsArrayBuffer(file);
+}
+
+function validatePattern(rows) {
+    // Check first 200 rows for "Dept Name:" marker
+    for (let i = 0; i < Math.min(rows.length, 200); i++) {
+        const firstCell = String(rows[i][0] || '').trim();
+        if (firstCell.startsWith('Dept Name:')) return true;
+    }
+    return false;
+}
+
+function showError() {
+    errorBanner.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetState() {
+    groupedData = {};
+    errorBanner.style.display = 'none';
+    filterSection.style.display = 'none';
+    previewSection.style.display = 'none';
+    previewTableBody.innerHTML = '';
 }
 
 function processRawData(rows) {
