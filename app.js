@@ -1,5 +1,5 @@
 let groupedData = {};
-let selectedCategories = new Set(["Frame", "Lens", "Contactlens", "Service", "น้ำยา"]);
+let selectedCategories = new Set(["Frame", "Lens", "Contactlens", "Service", "Accessories", "น้ำยา"]);
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -15,10 +15,11 @@ const CATEGORY_MAP = {
     'Lens': 'Lens',
     'Contactlens': 'Contactlens',
     'Service': 'Service',
+    'Accessories': 'Accessories',
     '': 'น้ำยา'
 };
 
-const TARGET_CATEGORIES = ["Frame", "Lens", "Contactlens", "Service", "น้ำยา"];
+const TARGET_CATEGORIES = ["Frame", "Lens", "Contactlens", "Service", "Accessories", "น้ำยา"];
 
 // UI Events
 dropZone.onclick = () => fileInput.click();
@@ -50,8 +51,9 @@ async function handleFile(file) {
             const worksheet = workbook.Sheets[firstSheetName];
             const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             
-            if (validatePattern(json)) {
-                processRawData(json);
+            const pattern = detectPattern(json);
+            if (pattern) {
+                processRawData(json, pattern);
             } else {
                 showError();
             }
@@ -63,13 +65,21 @@ async function handleFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-function validatePattern(rows) {
-    // Check first 200 rows for "Dept Name:" marker
+function detectPattern(rows) {
+    // Pattern 1: Legacy Dept Marker
     for (let i = 0; i < Math.min(rows.length, 200); i++) {
         const firstCell = String(rows[i][0] || '').trim();
-        if (firstCell.startsWith('Dept Name:')) return true;
+        if (firstCell.startsWith('Dept Name:')) return 'LEGACY_DEPT_MARKER';
     }
-    return false;
+    
+    // Pattern 2: Flat Table (Ex2.xls)
+    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+        const row = rows[i];
+        if (row && row[0] === 'Group Code' && row[1] === 'Group Name' && row[4] === 'Mat Code') {
+            return 'FLAT_TABLE';
+        }
+    }
+    return null;
 }
 
 function showError() {
@@ -85,35 +95,71 @@ function resetState() {
     previewTableBody.innerHTML = '';
 }
 
-function processRawData(rows) {
+function processRawData(rows, pattern) {
     groupedData = {};
-    let currentDept = null;
 
-    rows.forEach(row => {
-        if (!row || row.length === 0) return;
-        const firstCell = String(row[0] || '').trim();
-        
-        if (firstCell.startsWith('Dept Name:')) {
-            currentDept = firstCell.replace('Dept Name:', '').trim();
-            if (!groupedData[currentDept]) groupedData[currentDept] = [];
-        } 
-        else if (currentDept && row[3] && row[0]) {
-            let cat = CATEGORY_MAP[firstCell] || firstCell;
-            let balance = parseFloat(row[15]) || 0;
+    if (pattern === 'LEGACY_DEPT_MARKER') {
+        let currentDept = null;
+        rows.forEach(row => {
+            if (!row || row.length === 0) return;
+            const firstCell = String(row[0] || '').trim();
+            
+            if (firstCell.startsWith('Dept Name:')) {
+                currentDept = firstCell.replace('Dept Name:', '').trim();
+                if (!groupedData[currentDept]) groupedData[currentDept] = [];
+            } 
+            else if (currentDept && row[3] && row[0]) {
+                let rawCat = String(row[0] || '').trim();
+                let cat = CATEGORY_MAP[rawCat] || rawCat;
+                let balance = parseFloat(row[15]) || 0;
+                
+                // Skip items with 0 balance
+                if (balance === 0) return;
+
+                groupedData[currentDept].push({
+                    category: cat,
+                    type: row[1],
+                    dept: row[2],
+                    code: row[3],
+                    description: row[4],
+                    balance: balance
+                });
+            }
+        });
+    } else if (pattern === 'FLAT_TABLE') {
+        let dataStarted = false;
+        rows.forEach(row => {
+            if (!row || row.length < 15) return;
+            
+            // Detect header row
+            if (row[0] === 'Group Code' && row[4] === 'Mat Code') {
+                dataStarted = true;
+                return;
+            }
+            
+            if (!dataStarted) return;
+            if (!row[4]) return; // Skip if no Mat Code
+
+            const deptName = String(row[2] || 'General').trim();
+            if (!groupedData[deptName]) groupedData[deptName] = [];
+
+            let rawCat = String(row[1] || '').trim();
+            let cat = CATEGORY_MAP[rawCat] || rawCat;
+            let balance = parseFloat(row[14]) || 0;
             
             // Skip items with 0 balance
             if (balance === 0) return;
 
-            groupedData[currentDept].push({
+            groupedData[deptName].push({
                 category: cat,
-                type: row[1],
-                dept: row[2],
-                code: row[3],
-                description: row[4],
+                type: row[0], // Group Code
+                dept: row[2], // Dept Name
+                code: row[4], // Mat Code
+                description: row[5], // Mat Name
                 balance: balance
             });
-        }
-    });
+        });
+    }
 
     renderFilters();
     updatePreview();
