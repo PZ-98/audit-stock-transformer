@@ -29,20 +29,24 @@ const mappingFileInput = document.getElementById('mappingFileInput');
 let supabaseClient = null;
 let brandMappings = {};
 
-// Load Supabase Config from LocalStorage (for Admin's convenience)
-supabaseUrlInput.value = localStorage.getItem('supabaseUrl') || '';
-supabaseKeyInput.value = localStorage.getItem('supabaseKey') || '';
+// --- SUPABASE CONFIG (HARDCODED) ---
+const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dXZpeXVlYWp0Y2hwcmJhZmJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDYwMjgsImV4cCI6MjA5MzQyMjAyOH0.JapT1lildN2H_9TeHF_iNiL3ABbT7NJewaf_wqeT0Cg';
 
 async function initSupabase() {
-    const url = supabaseUrlInput.value.trim();
-    const key = supabaseKeyInput.value.trim();
+    // Users will use hardcoded values, Admin can override via UI
+    const url = DEFAULT_SUPABASE_URL;
+    const key = DEFAULT_SUPABASE_KEY;
+
     if (url && key && typeof supabase !== 'undefined') {
         supabaseClient = supabase.createClient(url, key);
         await syncMappings();
+    } else {
+        console.warn("Supabase SDK not loaded or credentials missing.");
     }
 }
 
-// Initial Sync
+// Initial Sync for all users (Background)
 initSupabase();
 
 async function syncMappings() {
@@ -128,8 +132,14 @@ loginBtn.onclick = async () => {
         loginError.style.display = 'none';
         passwordSection.style.display = 'none';
         settingsSection.style.display = 'block';
+        
+        // Reveal credentials only to Admin
+        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
+        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
+
         await initSupabase();
         renderMappings();
+        showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
     } else {
         loginError.style.display = 'block';
         adminPasswordInput.value = '';
