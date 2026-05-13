@@ -15,6 +15,7 @@ const adminBtn = document.getElementById('adminBtn');
 const adminModal = document.getElementById('adminModal');
 const closeModal = adminModal.querySelector('.close');
 const adminPasswordInput = document.getElementById('adminPassword');
+const adminEmail = document.getElementById('adminEmail');
 const loginBtn = document.getElementById('loginBtn');
 const passwordSection = document.getElementById('passwordSection');
 const settingsSection = document.getElementById('settingsSection');
@@ -29,20 +30,24 @@ const mappingFileInput = document.getElementById('mappingFileInput');
 let supabaseClient = null;
 let brandMappings = {};
 
-// --- SUPABASE CONFIG (HARDCODED) ---
-const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dXZpeXVlYWp0Y2hwcmJhZmJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDYwMjgsImV4cCI6MjA5MzQyMjAyOH0.JapT1lildN2H_9TeHF_iNiL3ABbT7NJewaf_wqeT0Cg';
+// --- SUPABASE CONFIG ---
+const DEFAULT_SUPABASE_URL = 'https://xxzixxdfvwpfxxstxsz.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eml4eGRmdndwZnh4c3R4c3oiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc1OTI1OTUzMSwiZXhwIjoyMDc0ODMzNTMxfQ.s2p8G71y7p6l-j2D5g0_BwW9L8qX5uE-L5V1m71W3R4';
 
 async function initSupabase() {
-    // Users will use hardcoded values, Admin can override via UI
-    const url = DEFAULT_SUPABASE_URL;
-    const key = DEFAULT_SUPABASE_KEY;
-
-    if (url && key && typeof supabase !== 'undefined') {
-        supabaseClient = supabase.createClient(url, key);
+    if (typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+        
+        // Initial sync of mappings (can be done as anon)
         await syncMappings();
+
+        // Check for existing session
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            updateAdminUI(true);
+        }
     } else {
-        console.warn("Supabase SDK not loaded or credentials missing.");
+        console.warn("Supabase SDK not loaded.");
     }
 }
 
@@ -63,6 +68,7 @@ async function syncMappings() {
         console.log("Mappings synced from Supabase:", Object.keys(brandMappings).length);
     } catch (err) {
         console.error("Supabase sync error:", err);
+        showToast(`Sync ล้มเหลว: ${err.message || 'โปรดตรวจสอบชื่อตาราง brand_mappings'}`, 'warning');
     }
 }
 
@@ -97,13 +103,20 @@ dropZone.ondrop = (e) => {
 // Search Logic removed
 
 // Admin Logic
-adminBtn.onclick = () => {
+adminBtn.onclick = async () => {
     adminModal.style.display = 'block';
-    passwordSection.style.display = 'flex';
-    settingsSection.style.display = 'none';
+    
+    // Check session again when opening
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        updateAdminUI(true);
+    } else {
+        updateAdminUI(false);
+    }
+    
+    adminEmail.value = '';
     adminPasswordInput.value = '';
     loginError.style.display = 'none';
-    setTimeout(() => adminPasswordInput.focus(), 100);
 };
 
 const adminCancelBtn = document.getElementById('adminCancelBtn');
@@ -128,24 +141,59 @@ adminPasswordInput.addEventListener('keypress', (e) => {
 });
 
 loginBtn.onclick = async () => {
-    if (adminPasswordInput.value === '366719') {
-        loginError.style.display = 'none';
-        passwordSection.style.display = 'none';
-        settingsSection.style.display = 'block';
-        
-        // Reveal credentials only to Admin
-        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
-        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
+    const email = adminEmail.value.trim();
+    const password = adminPasswordInput.value;
 
-        await initSupabase();
+    if (!email || !password) {
+        showToast('กรุณากรอก Email และรหัสผ่าน', 'warning');
+        return;
+    }
+
+    try {
+        loginBtn.disabled = true;
+        loginBtn.textContent = '⌛ กำลังเข้าสู่ระบบ...';
+        
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        if (error) throw error;
+
+        updateAdminUI(true);
+        await syncMappings(); 
         renderMappings();
         showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
-    } else {
+    } catch (err) {
+        console.error("Login error:", err);
+        loginError.textContent = `❌ ${err.message}`;
         loginError.style.display = 'block';
         adminPasswordInput.value = '';
-        adminPasswordInput.focus();
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'เข้าสู่ระบบ';
     }
 };
+
+const logoutBtn = document.getElementById('logoutBtn');
+logoutBtn.onclick = async () => {
+    await supabaseClient.auth.signOut();
+    updateAdminUI(false);
+    showToast('ออกจากระบบเรียบร้อย', 'info');
+};
+
+function updateAdminUI(isLoggedIn) {
+    if (isLoggedIn) {
+        passwordSection.style.display = 'none';
+        settingsSection.style.display = 'block';
+        // Reveal credentials to Admin (for info)
+        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
+        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
+    } else {
+        passwordSection.style.display = 'flex';
+        settingsSection.style.display = 'none';
+    }
+}
 
 function renderMappings() {
     mappingList.innerHTML = '';
