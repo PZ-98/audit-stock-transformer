@@ -128,8 +128,17 @@ adminPasswordInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') loginBtn.click();
 });
 
+// Helper to hash password (SHA-256)
+async function hashPassword(password) {
+    const msgUint8 = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 loginBtn.onclick = async () => {
-    if (adminPasswordInput.value === '366719') {
+    const inputHash = await hashPassword(adminPasswordInput.value);
+    if (inputHash === '27a307d3e70ee464d6cbdd13812e501e3010ada7318ddac7c5d3696d9613df0c') {
         loginError.style.display = 'none';
         passwordSection.style.display = 'none';
         settingsSection.style.display = 'block';
