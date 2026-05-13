@@ -138,6 +138,7 @@ async function hashPassword(password) {
 
 loginBtn.onclick = async () => {
     const inputHash = await hashPassword(adminPasswordInput.value);
+
     if (inputHash === '27a307d3e70ee464d6cbdd13812e501e3010ada7318ddac7c5d3696d9613df0c') {
         loginError.style.display = 'none';
         passwordSection.style.display = 'none';
@@ -572,6 +573,7 @@ function updatePreview() {
             <td>${subtotal.toLocaleString()}</td>
             <td></td>
             <td></td>
+            <td></td>
         `;
         previewTableBody.appendChild(headerTr);
 
@@ -587,6 +589,7 @@ function updatePreview() {
                 <td>${item.code}</td>
                 <td>${item.description}</td>
                 <td>${item.balance.toLocaleString()}</td>
+                <td></td>
                 <td></td>
                 <td></td>
             `;
@@ -632,13 +635,13 @@ async function exportToExcel(branchCode) {
     // Main Header with Branch Code
     const titleText = branchCode ? `Audit Stock Report สาขา ${branchCode}` : 'Audit Stock Report';
     const titleRow = worksheet.addRow([titleText]);
-    worksheet.mergeCells('A1:H1');
+    worksheet.mergeCells('A1:I1');
     titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
     titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }; 
 
     // Table Headers
-    const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance"]);
+    const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
     headerRow.font = { bold: true };
     headerRow.eachCell(cell => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
@@ -650,7 +653,7 @@ async function exportToExcel(branchCode) {
         if (filteredItems.length === 0) return;
 
         // Add Dept Name Header Row (Styled with #404040 background and white text)
-        const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0]);
+        const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0, ""]);
         deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // White Text
         deptRow.eachCell(cell => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } }; // Dark Gray
@@ -666,12 +669,22 @@ async function exportToExcel(branchCode) {
                 item.description,
                 item.balance,
                 null, 
+                null,
                 null 
             ]);
             row.outlineLevel = 1;
             const rowIndex = row.number;
             row.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
         });
+
+        // Add 5 blank rows for manual entry per Dept
+        for (let j = 0; j < 5; j++) {
+            const blankRow = worksheet.addRow(["", "", "", "", "(เพิ่มรายการใหม่)", 0, null, null, null]);
+            blankRow.outlineLevel = 1;
+            const rowIndex = blankRow.number;
+            blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
+        }
+
         const endRow = worksheet.rowCount;
 
         // Set dynamic SUM formulas for System and Actual
@@ -685,7 +698,7 @@ async function exportToExcel(branchCode) {
 
     // Column Widths
     worksheet.columns = [
-        { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }
+        { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
     ];
 
     // Filename logic
