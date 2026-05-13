@@ -54,7 +54,7 @@ async function syncMappings() {
     try {
         const { data, error } = await supabaseClient.from('brand_mappings').select('*');
         if (error) throw error;
-        
+
         const newMappings = {};
         data.forEach(item => {
             newMappings[item.original_name] = item.replacement_name;
@@ -143,7 +143,7 @@ loginBtn.onclick = async () => {
         loginError.style.display = 'none';
         passwordSection.style.display = 'none';
         settingsSection.style.display = 'block';
-        
+
         // Reveal credentials only to Admin
         supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
         supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
@@ -191,7 +191,7 @@ mappingFileInput.onchange = (e) => {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-        
+
         json.forEach((row, i) => {
             if (i === 0 || !row[0]) return; // Skip header or empty
             addMappingRow(String(row[0]).trim(), String(row[1] || '').trim());
@@ -224,12 +224,12 @@ saveMappingBtn.onclick = async () => {
         saveMappingBtn.disabled = true;
 
         // Simple sync strategy: Clear and re-insert
-        await supabaseClient.from('brand_mappings').delete().neq('id', 0); 
+        await supabaseClient.from('brand_mappings').delete().neq('id', 0);
         const { error } = await supabaseClient.from('brand_mappings').insert(rowsToSave);
-        
+
         if (error) throw error;
-        
-        await syncMappings(); 
+
+        await syncMappings();
         alert('บันทึกข้อมูลลง Supabase เรียบร้อยแล้ว!');
         adminModal.style.display = 'none';
         if (Object.keys(groupedData).length > 0) updatePreview();
@@ -246,7 +246,7 @@ function formatDeptName(rawName) {
     if (!rawName) return 'General';
     // 1. Replace "Dept Name:" with "" and TRIM
     let name = String(rawName).replace(/Dept\s*Name:\s*/gi, '').trim();
-    
+
     // 2. Apply Lookup Mapping
     if (brandMappings[name]) {
         return brandMappings[name];
@@ -256,7 +256,7 @@ function formatDeptName(rawName) {
 
 async function handleFile(file) {
     if (!file) return;
-    
+
     // Visual Loading State
     const dropZoneText = dropZone.querySelector('p');
     const originalText = dropZoneText.textContent;
@@ -265,7 +265,7 @@ async function handleFile(file) {
     dropZone.style.pointerEvents = "none";
 
     resetState();
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
@@ -274,10 +274,10 @@ async function handleFile(file) {
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
+
             console.log("File loaded, rows:", json.length);
             const result = detectPattern(json);
-            
+
             if (result && result.type) {
                 console.log("Pattern detected:", result.type, result.mapping);
                 processRawData(json, result);
@@ -310,7 +310,7 @@ function detectPattern(rows) {
         const firstCell = String(rows[i][0] || '').trim();
         if (firstCell.startsWith('Dept Name:')) return { type: 'LEGACY_DEPT_MARKER' };
     }
-    
+
     // 2. Smart Header Detection (Search for column keywords)
     const headerKeywords = {
         code: ['mat code', 'รหัสสินค้า', 'product code', 'item code'],
@@ -348,10 +348,10 @@ function detectPattern(rows) {
         });
 
         // Found the core columns? (Strict: Need code, name, balance, and groupName)
-        const hasRequired = mapping.code !== undefined && 
-                          mapping.name !== undefined && 
-                          mapping.balance !== undefined && 
-                          mapping.groupName !== undefined;
+        const hasRequired = mapping.code !== undefined &&
+            mapping.name !== undefined &&
+            mapping.balance !== undefined &&
+            mapping.groupName !== undefined;
 
         if (hasRequired) {
             return {
@@ -387,11 +387,11 @@ function showError() {
 
 function showFormatError(missingColumns = []) {
     showError();
-    
+
     // Build a descriptive toast message with solutions
     let title = 'รูปแบบไฟล์ไม่ถูกต้อง';
     let body = 'ระบบไม่สามารถตรวจพบข้อมูลที่จำเป็นได้ครบถ้วน:\n';
-    
+
     if (missingColumns.length > 0) {
         missingColumns.forEach(col => body += `\n  ❌ ไม่พบ: ${col}`);
     } else {
@@ -404,7 +404,7 @@ function showFormatError(missingColumns = []) {
     body += '2. ตรวจสอบว่าคุณอัปโหลดไฟล์ "รายงานคงเหลือตามคลังสินค้า" จากโปรแกรม Inventory\n';
     body += '3. ตรวจสอบว่าข้อมูลใน Excel เริ่มต้นที่ Sheet แรกเสมอ\n';
     body += '4. หากยังพบปัญหา โปรดดู "วิธีโหลดไฟล์" ที่ปุ่มด้านล่างขวาของหน้าจอ';
-    
+
     showToast(`${title}\n${body}`, 'error');
 }
 
@@ -467,16 +467,16 @@ function processRawData(rows, result) {
         rows.forEach(row => {
             if (!row || row.length === 0) return;
             const firstCell = String(row[0] || '').trim();
-            
+
             if (firstCell.startsWith('Dept Name:')) {
                 currentDept = formatDeptName(firstCell);
                 if (!groupedData[currentDept]) groupedData[currentDept] = [];
-            } 
+            }
             else if (currentDept && row[3] && row[0]) {
                 let rawCat = String(row[0] || '').trim();
                 let cat = CATEGORY_MAP[rawCat] || rawCat;
                 let balance = parseFloat(row[15]) || 0;
-                
+
                 if (balance === 0) return;
 
                 groupedData[currentDept].push({
@@ -491,7 +491,7 @@ function processRawData(rows, result) {
         });
     } else if (pattern === 'FLAT_TABLE') {
         const { headerRowIndex, mapping } = result;
-        
+
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row || !row[mapping.code]) continue;
@@ -502,7 +502,7 @@ function processRawData(rows, result) {
             let rawCat = mapping.groupName !== undefined ? String(row[mapping.groupName] || '').trim() : '';
             let cat = CATEGORY_MAP[rawCat] || rawCat;
             let balance = parseFloat(row[mapping.balance]) || 0;
-            
+
             if (balance === 0) continue; // Fix: use continue instead of return to skip 0 balance items
 
             groupedData[deptName].push({
@@ -558,7 +558,7 @@ document.getElementById('deselectAll').onclick = () => {
 function updatePreview() {
     previewTableBody.innerHTML = '';
     let rowCount = 0;
-    
+
     Object.keys(groupedData).forEach(dept => {
         let filteredItems = groupedData[dept].filter(item => selectedCategories.has(item.category));
 
@@ -580,7 +580,7 @@ function updatePreview() {
         filteredItems.forEach(item => {
             rowCount++;
             if (rowCount > 100) return; // Limit preview for performance
-            
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${item.category}</td>
@@ -602,15 +602,15 @@ function updatePreview() {
 
 async function exportToExcel(branchCode) {
     const workbook = new ExcelJS.Workbook();
-    
+
     // 1. Instruction Sheet (First Tab)
     const insSheet = workbook.addWorksheet('คู่มือการใช้งาน', { properties: { tabColor: { argb: 'FFFF0000' } } });
     insSheet.columns = [{ width: 5 }, { width: 80 }];
-    
+
     const insTitle = insSheet.addRow(["", "คู่มือการใช้งานไฟล์ Audit Stock"]);
     insTitle.font = { size: 18, bold: true, color: { argb: 'FF4F46E5' } };
     insSheet.addRow([]); // Blank
-    
+
     const instructions = [
         "1. ตรวจสอบข้อมูลแผนกและหมวดหมู่สินค้าในหน้า 'Audit Stock'",
         "2. กรอกจำนวนสินค้าที่นับได้จริงในคอลัมน์ 'Actual Count' (ช่องสีขาว)",
@@ -618,7 +618,7 @@ async function exportToExcel(branchCode) {
         "4. การจัดการในรูปแบบ Group: สามารถใช้เครื่องหมาย (+) และ (-) ทางด้านซ้ายมือเพื่อย่อหรือขยายรายละเอียดในแต่ละ Group ได้",
         "5. ยอดรวมตาม Group: บรรทัดสีเทาเข้มจะแสดงผลรวมของสินค้าใน Group นั้นๆ ซึ่งจะขยับตามจำนวนที่คุณกรอกจริง"
     ];
-    
+
     instructions.forEach((text, i) => {
         const row = insSheet.addRow(["", text]);
         row.font = { size: 12 };
@@ -629,8 +629,8 @@ async function exportToExcel(branchCode) {
     // 2. Audit Sheet (Second Tab)
     const worksheet = workbook.addWorksheet('Audit Stock', {
         views: [{ state: 'frozen', ySplit: 2 }],
-        properties: { 
-            outlineLevelCol: 0, 
+        properties: {
+            outlineLevelCol: 0,
             outlineLevelRow: 1,
             outlineProperties: { summaryBelow: false }
         }
@@ -642,7 +642,7 @@ async function exportToExcel(branchCode) {
     worksheet.mergeCells('A1:I1');
     titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }; 
+    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
 
     // Table Headers
     const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
@@ -672,9 +672,9 @@ async function exportToExcel(branchCode) {
                 item.code,
                 item.description,
                 item.balance,
-                null, 
                 null,
-                null 
+                null,
+                null
             ]);
             row.outlineLevel = 1;
             const rowIndex = row.number;
@@ -683,11 +683,11 @@ async function exportToExcel(branchCode) {
 
         // Add 5 blank rows for manual entry per Dept
         for (let j = 0; j < 5; j++) {
-            const blankRow = worksheet.addRow(["", "", "", "", "(เพิ่มรายการใหม่)", 0, null, null, null]);
+            const blankRow = worksheet.addRow(["", "", "-", 0, null, null, null]);
             blankRow.outlineLevel = 1;
             const rowIndex = blankRow.number;
             blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
-            
+
             // Add borders to blank row cells
             blankRow.eachCell({ includeEmpty: true }, (cell) => {
                 cell.border = {
@@ -704,7 +704,7 @@ async function exportToExcel(branchCode) {
         // Set dynamic SUM formulas for System and Actual
         deptRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
         deptRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
-        
+
         // Variance formula for Dept row: Actual (G) - System (F)
         const deptRowIndex = deptRow.number;
         deptRow.getCell(8).value = { formula: `G${deptRowIndex}-F${deptRowIndex}` };
