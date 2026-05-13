@@ -15,7 +15,6 @@ const adminBtn = document.getElementById('adminBtn');
 const adminModal = document.getElementById('adminModal');
 const closeModal = adminModal.querySelector('.close');
 const adminPasswordInput = document.getElementById('adminPassword');
-const adminEmail = document.getElementById('adminEmail');
 const loginBtn = document.getElementById('loginBtn');
 const passwordSection = document.getElementById('passwordSection');
 const settingsSection = document.getElementById('settingsSection');
@@ -37,17 +36,9 @@ const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 async function initSupabase() {
     if (typeof supabase !== 'undefined') {
         supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
-        
-        // Initial sync of mappings (can be done as anon)
         await syncMappings();
-
-        // Check for existing session
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session) {
-            updateAdminUI(true);
-        }
     } else {
-        console.warn("Supabase SDK not loaded.");
+        console.warn("Supabase SDK not loaded or credentials missing.");
     }
 }
 
@@ -103,20 +94,13 @@ dropZone.ondrop = (e) => {
 // Search Logic removed
 
 // Admin Logic
-adminBtn.onclick = async () => {
+adminBtn.onclick = () => {
     adminModal.style.display = 'block';
-    
-    // Check session again when opening
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-        updateAdminUI(true);
-    } else {
-        updateAdminUI(false);
-    }
-    
-    adminEmail.value = '';
+    passwordSection.style.display = 'flex';
+    settingsSection.style.display = 'none';
     adminPasswordInput.value = '';
     loginError.style.display = 'none';
+    setTimeout(() => adminPasswordInput.focus(), 100);
 };
 
 const adminCancelBtn = document.getElementById('adminCancelBtn');
@@ -141,59 +125,24 @@ adminPasswordInput.addEventListener('keypress', (e) => {
 });
 
 loginBtn.onclick = async () => {
-    const email = adminEmail.value.trim();
-    const password = adminPasswordInput.value;
-
-    if (!email || !password) {
-        showToast('กรุณากรอก Email และรหัสผ่าน', 'warning');
-        return;
-    }
-
-    try {
-        loginBtn.disabled = true;
-        loginBtn.textContent = '⌛ กำลังเข้าสู่ระบบ...';
+    if (adminPasswordInput.value === '366719') {
+        loginError.style.display = 'none';
+        passwordSection.style.display = 'none';
+        settingsSection.style.display = 'block';
         
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
+        // Reveal credentials only to Admin
+        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
+        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
 
-        if (error) throw error;
-
-        updateAdminUI(true);
         await syncMappings(); 
         renderMappings();
         showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
-    } catch (err) {
-        console.error("Login error:", err);
-        loginError.textContent = `❌ ${err.message}`;
+    } else {
         loginError.style.display = 'block';
         adminPasswordInput.value = '';
-    } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'เข้าสู่ระบบ';
+        adminPasswordInput.focus();
     }
 };
-
-const logoutBtn = document.getElementById('logoutBtn');
-logoutBtn.onclick = async () => {
-    await supabaseClient.auth.signOut();
-    updateAdminUI(false);
-    showToast('ออกจากระบบเรียบร้อย', 'info');
-};
-
-function updateAdminUI(isLoggedIn) {
-    if (isLoggedIn) {
-        passwordSection.style.display = 'none';
-        settingsSection.style.display = 'block';
-        // Reveal credentials to Admin (for info)
-        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
-        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
-    } else {
-        passwordSection.style.display = 'flex';
-        settingsSection.style.display = 'none';
-    }
-}
 
 function renderMappings() {
     mappingList.innerHTML = '';
