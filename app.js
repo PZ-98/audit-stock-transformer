@@ -681,9 +681,10 @@ async function exportToExcel(branchCode) {
             row.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
         });
 
-        // Add 5 blank rows for manual entry per Dept
-        for (let j = 0; j < 5; j++) {
-            const blankRow = worksheet.addRow(["", "", "-", 0, null, null, null]);
+        // Add 2 blank rows for manual entry per Dept
+        for (let j = 0; j < 2; j++) {
+            // Correct array for 9 columns (A to I)
+            const blankRow = worksheet.addRow(["", "", "", "", "-", 0, null, null, null]);
             blankRow.outlineLevel = 1;
             const rowIndex = blankRow.number;
             blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
