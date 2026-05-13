@@ -29,13 +29,17 @@ const mappingFileInput = document.getElementById('mappingFileInput');
 let supabaseClient = null;
 let brandMappings = {};
 
-// --- SUPABASE CONFIG ---
+// --- SUPABASE CONFIG (HARDCODED) ---
 const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dXZpeXVlYWp0Y2hwcmJhZmJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDYwMjgsImV4cCI6MjA5MzQyMjAyOH0.JapT1lildN2H_9TeHF_iNiL3ABbT7NJewaf_wqeT0Cg';
 
 async function initSupabase() {
-    if (typeof supabase !== 'undefined') {
-        supabaseClient = supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_KEY);
+    // Users will use hardcoded values, Admin can override via UI
+    const url = DEFAULT_SUPABASE_URL;
+    const key = DEFAULT_SUPABASE_KEY;
+
+    if (url && key && typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(url, key);
         await syncMappings();
     } else {
         console.warn("Supabase SDK not loaded or credentials missing.");
@@ -134,7 +138,8 @@ loginBtn.onclick = async () => {
         supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
         supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
 
-        await syncMappings(); 
+        await initSupabase();
+        await syncMappings(); // Force re-sync to be sure
         renderMappings();
         showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
     } else {
