@@ -31,8 +31,8 @@ let supabaseClient = null;
 let brandMappings = {};
 
 // --- SUPABASE CONFIG ---
-const DEFAULT_SUPABASE_URL = 'https://xxzixxdfvwpfxxstxsz.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eml4eGRmdndwZnh4c3R4c3oiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc1OTI1OTUzMSwiZXhwIjoyMDc0ODMzNTMxfQ.s2p8G71y7p6l-j2D5g0_BwW9L8qX5uE-L5V1m71W3R4';
+const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dXZpeXVlYWp0Y2hwcmJhZmJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDYwMjgsImV4cCI6MjA5MzQyMjAyOH0.JapT1lildN2H_9TeHF_iNiL3ABbT7NJewaf_wqeT0Cg';
 
 async function initSupabase() {
     if (typeof supabase !== 'undefined') {
