@@ -629,7 +629,11 @@ async function exportToExcel(branchCode) {
     // 2. Audit Sheet (Second Tab)
     const worksheet = workbook.addWorksheet('Audit Stock', {
         views: [{ state: 'frozen', ySplit: 2 }],
-        properties: { outlineLevelCol: 0, outlineLevelRow: 1 }
+        properties: { 
+            outlineLevelCol: 0, 
+            outlineLevelRow: 1,
+            outlineProperties: { summaryBelow: false }
+        }
     });
 
     // Main Header with Branch Code
@@ -683,6 +687,16 @@ async function exportToExcel(branchCode) {
             blankRow.outlineLevel = 1;
             const rowIndex = blankRow.number;
             blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
+            
+            // Add borders to blank row cells
+            blankRow.eachCell({ includeEmpty: true }, (cell) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
         }
 
         const endRow = worksheet.rowCount;
