@@ -718,6 +718,59 @@ tr.dept-row td {
   border-color: var(--border-color);
 }
 
+/* Dynamic Tab Bar for Preview */
+.preview-tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.preview-tab {
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.preview-tab:hover {
+  background: rgba(79, 70, 229, 0.05);
+  color: var(--primary);
+  border-color: var(--primary-light);
+}
+
+.preview-tab.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.preview-tab .count-badge {
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.preview-tab.active .count-badge {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 600px) {
   h1 { font-size: 1.5rem; }
   .step-card { padding: 1.5rem; }
 }

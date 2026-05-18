@@ -9,6 +9,7 @@ const previewSection = document.getElementById('previewSection');
 const previewTableBody = document.querySelector('#previewTable tbody');
 const downloadBtn = document.getElementById('downloadBtn');
 const errorBanner = document.getElementById('errorBanner');
+const previewTabBar = document.getElementById('previewTabBar');
 
 // Admin Elements
 const adminBtn = document.getElementById('adminBtn');
@@ -28,6 +29,7 @@ const mappingFileInput = document.getElementById('mappingFileInput');
 
 let supabaseClient = null;
 let brandMappings = {};
+let activePreviewTab = 'All';
 
 // --- SUPABASE CONFIG (HARDCODED) ---
 const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
@@ -170,7 +172,7 @@ function addMappingRow(key = '', val = '') {
     const div = document.createElement('div');
     div.className = 'mapping-row';
     div.innerHTML = `
-        <input type="text" class="map-key settings-input" placeholder="Original (เช่น FMT)" value="${key}">
+        <input type="text" class="map-key settings-input" placeholder="Original (เช่น FMT หรือ 8851234567)" value="${key}">
         <span style="text-align:center; color: var(--text-muted);">&#8594;</span>
         <input type="text" class="map-val settings-input" placeholder="Replace with (เช่น Mykita)" value="${val}">
         <button class="remove-mapping" title="ลบ">&times;</button>
@@ -242,16 +244,34 @@ saveMappingBtn.onclick = async () => {
     }
 };
 
-function formatDeptName(rawName) {
-    if (!rawName) return 'General';
-    // 1. Replace "Dept Name:" with "" and TRIM
-    let name = String(rawName).replace(/Dept\s*Name:\s*/gi, '').trim();
-
-    // 2. Apply Lookup Mapping
-    if (brandMappings[name]) {
-        return brandMappings[name];
+function getMappedName(category, rawDept, matCode) {
+    if (!rawDept) rawDept = 'General';
+    
+    // Clean rawDept (remove "Dept Name:" prefix and trim)
+    let deptName = String(rawDept).replace(/Dept\s*Name:\s*/gi, '').trim();
+    const cat = String(category || '').trim().toLowerCase();
+    
+    if (cat === 'frame') {
+        // If Group name = frame, lookup using Deptname from database (brandMappings)
+        if (brandMappings[deptName]) {
+            return brandMappings[deptName];
+        }
+        return deptName;
+    } else if (cat === 'contactlens') {
+        // If Group name = Contactlens, use first 10 characters of Matcode to lookup
+        const code = String(matCode || '').trim();
+        const first10 = code.substring(0, 10);
+        if (brandMappings[first10]) {
+            return brandMappings[first10];
+        }
+        return deptName; // Fallback to raw/cleaned Dept name if not found
+    } else {
+        // For other groups, lookup using Deptname from database as fallback
+        if (brandMappings[deptName]) {
+            return brandMappings[deptName];
+        }
+        return deptName;
     }
-    return name;
 }
 
 async function handleFile(file) {
@@ -452,6 +472,9 @@ function showToast(message, type = 'info') {
 
 function resetState() {
     groupedData = {};
+    activePreviewTab = 'All';
+    previewTabBar.innerHTML = '';
+    previewTabBar.style.display = 'none';
     errorBanner.style.display = 'none';
     filterSection.style.display = 'none';
     previewSection.style.display = 'none';
@@ -463,27 +486,33 @@ function processRawData(rows, result) {
     const pattern = result.type;
 
     if (pattern === 'LEGACY_DEPT_MARKER') {
-        let currentDept = null;
+        let currentDeptRaw = null;
         rows.forEach(row => {
             if (!row || row.length === 0) return;
             const firstCell = String(row[0] || '').trim();
 
             if (firstCell.startsWith('Dept Name:')) {
-                currentDept = formatDeptName(firstCell);
-                if (!groupedData[currentDept]) groupedData[currentDept] = [];
+                currentDeptRaw = firstCell.replace(/Dept\s*Name:\s*/gi, '').trim();
             }
-            else if (currentDept && row[3] && row[0]) {
+            else if (currentDeptRaw && row[3] && row[0]) {
                 let rawCat = String(row[0] || '').trim();
                 let cat = CATEGORY_MAP[rawCat] || rawCat;
                 let balance = parseFloat(row[15]) || 0;
 
                 if (balance === 0) return;
 
-                groupedData[currentDept].push({
+                let code = String(row[3]).trim();
+                let finalDeptName = getMappedName(cat, currentDeptRaw, code);
+
+                if (!groupedData[finalDeptName]) {
+                    groupedData[finalDeptName] = [];
+                }
+
+                groupedData[finalDeptName].push({
                     category: cat,
                     type: row[1],
-                    dept: row[2],
-                    code: row[3],
+                    dept: finalDeptName,
+                    code: code,
                     description: row[4],
                     balance: balance
                 });
@@ -496,20 +525,25 @@ function processRawData(rows, result) {
             const row = rows[i];
             if (!row || !row[mapping.code]) continue;
 
-            const deptName = mapping.dept !== undefined ? formatDeptName(row[mapping.dept]) : 'General';
-            if (!groupedData[deptName]) groupedData[deptName] = [];
-
             let rawCat = mapping.groupName !== undefined ? String(row[mapping.groupName] || '').trim() : '';
             let cat = CATEGORY_MAP[rawCat] || rawCat;
             let balance = parseFloat(row[mapping.balance]) || 0;
 
             if (balance === 0) continue; // Fix: use continue instead of return to skip 0 balance items
 
-            groupedData[deptName].push({
+            const rawDept = mapping.dept !== undefined ? String(row[mapping.dept] || '').trim() : 'General';
+            const code = String(row[mapping.code]).trim();
+            const finalDeptName = getMappedName(cat, rawDept, code);
+
+            if (!groupedData[finalDeptName]) {
+                groupedData[finalDeptName] = [];
+            }
+
+            groupedData[finalDeptName].push({
                 category: cat,
                 type: mapping.groupCode !== undefined ? String(row[mapping.groupCode] || '').trim() : '',
-                dept: deptName,
-                code: String(row[mapping.code]).trim(),
+                dept: finalDeptName,
+                code: code,
                 description: String(row[mapping.name] || '').trim(),
                 balance: balance
             });
@@ -559,8 +593,70 @@ function updatePreview() {
     previewTableBody.innerHTML = '';
     let rowCount = 0;
 
+    // Find all categories that actually have data
+    const categoriesWithData = new Set();
+    Object.values(groupedData).forEach(items => {
+        items.forEach(item => {
+            if (selectedCategories.has(item.category)) {
+                categoriesWithData.add(item.category);
+            }
+        });
+    });
+
+    const activeCategories = Array.from(categoriesWithData);
+
+    // Keep active preview tab in check
+    if (activePreviewTab !== 'All' && !categoriesWithData.has(activePreviewTab)) {
+        activePreviewTab = 'All';
+    }
+
+    // Render Tab Bar if there are multiple active categories
+    if (activeCategories.length > 1) {
+        previewTabBar.innerHTML = '';
+        previewTabBar.style.display = 'flex';
+
+        // 1. All tab
+        const totalItemsCount = Object.values(groupedData).reduce((sum, items) => {
+            return sum + items.filter(item => selectedCategories.has(item.category)).length;
+        }, 0);
+
+        const allTab = document.createElement('div');
+        allTab.className = `preview-tab ${activePreviewTab === 'All' ? 'active' : ''}`;
+        allTab.innerHTML = `ทั้งหมด <span class="count-badge">${totalItemsCount}</span>`;
+        allTab.onclick = () => {
+            activePreviewTab = 'All';
+            updatePreview();
+        };
+        previewTabBar.appendChild(allTab);
+
+        // 2. Individual product tabs
+        activeCategories.forEach(cat => {
+            const catItemsCount = Object.values(groupedData).reduce((sum, items) => {
+                return sum + items.filter(item => item.category === cat).length;
+            }, 0);
+
+            const tab = document.createElement('div');
+            tab.className = `preview-tab ${activePreviewTab === cat ? 'active' : ''}`;
+            tab.innerHTML = `${cat} <span class="count-badge">${catItemsCount}</span>`;
+            tab.onclick = () => {
+                activePreviewTab = cat;
+                updatePreview();
+            };
+            previewTabBar.appendChild(tab);
+        });
+    } else {
+        previewTabBar.style.display = 'none';
+        activePreviewTab = 'All';
+    }
+
     Object.keys(groupedData).forEach(dept => {
-        let filteredItems = groupedData[dept].filter(item => selectedCategories.has(item.category));
+        let filteredItems = groupedData[dept].filter(item => {
+            if (activePreviewTab === 'All') {
+                return selectedCategories.has(item.category);
+            } else {
+                return item.category === activePreviewTab;
+            }
+        });
 
         if (filteredItems.length === 0) return;
 
@@ -612,7 +708,7 @@ async function exportToExcel(branchCode) {
     insSheet.addRow([]); // Blank
 
     const instructions = [
-        "1. ตรวจสอบข้อมูลแผนกและหมวดหมู่สินค้าในหน้า 'Audit Stock'",
+        "1. ตรวจสอบข้อมูลแผนกและหมวดหมู่สินค้าในแต่ละแท็บ (เช่น Frame, Lens, Contactlens)",
         "2. กรอกจำนวนสินค้าที่นับได้จริงในคอลัมน์ 'Actual Count' (ช่องสีขาว)",
         "3. ระบบจะคำนวณผลต่าง (Variance) ให้โดยอัตโนมัติในคอลัมน์ 'Variance'",
         "4. การจัดการในรูปแบบ Group: สามารถใช้เครื่องหมาย (+) และ (-) ทางด้านซ้ายมือเพื่อย่อหรือขยายรายละเอียดในแต่ละ Group ได้",
@@ -626,98 +722,122 @@ async function exportToExcel(branchCode) {
         insSheet.addRow([]); // Space between points
     });
 
-    // 2. Audit Sheet (Second Tab)
-    const worksheet = workbook.addWorksheet('Audit Stock', {
-        views: [{ state: 'frozen', ySplit: 2 }],
-        properties: {
-            outlineLevelCol: 0,
-            outlineLevelRow: 1,
-            outlineProperties: { summaryBelow: false }
-        }
+    // 2. Audit Sheets (Separate Tab for each Category)
+    const activeCategories = Array.from(selectedCategories).filter(cat => {
+        return Object.values(groupedData).some(items => items.some(item => item.category === cat));
     });
 
-    // Main Header with Branch Code
-    const titleText = branchCode ? `Audit Stock Report สาขา ${branchCode}` : 'Audit Stock Report';
-    const titleRow = worksheet.addRow([titleText]);
-    worksheet.mergeCells('A1:I1');
-    titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    activeCategories.forEach(cat => {
+        // Slick, harmonious brand-specific tab colors
+        let tabColor = 'FF4F46E5'; // Default: Indigo
+        if (cat === 'Frame') tabColor = 'FF4F46E5';
+        else if (cat === 'Lens') tabColor = 'FF10B981'; // Emerald
+        else if (cat === 'Contactlens') tabColor = 'FFF59E0B'; // Amber
+        else if (cat === 'Service') tabColor = 'FF8B5CF6'; // Purple
+        else if (cat === 'Accessories') tabColor = 'FFEC4899'; // Pink
+        else if (cat === 'น้ำยา') tabColor = 'FF06B6D4'; // Cyan
 
-    // Table Headers
-    const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
-    headerRow.font = { bold: true };
-    headerRow.eachCell(cell => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
-        cell.border = { bottom: { style: 'thin' } };
-    });
-
-    Object.keys(groupedData).forEach(dept => {
-        const filteredItems = groupedData[dept].filter(item => selectedCategories.has(item.category));
-        if (filteredItems.length === 0) return;
-
-        // Add Dept Name Header Row (Styled with #404040 background and white text)
-        const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0, ""]);
-        deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // White Text
-        deptRow.eachCell(cell => {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } }; // Dark Gray
+        const worksheet = workbook.addWorksheet(cat, {
+            views: [{ state: 'frozen', ySplit: 2 }],
+            properties: {
+                tabColor: { argb: tabColor },
+                outlineLevelCol: 0,
+                outlineLevelRow: 1,
+                outlineProperties: { summaryBelow: false }
+            }
         });
 
-        const startRow = worksheet.rowCount + 1;
-        filteredItems.forEach(item => {
-            const row = worksheet.addRow([
-                item.category,
-                item.type,
-                item.dept,
-                item.code,
-                item.description,
-                item.balance,
-                null,
-                null,
-                null
-            ]);
-            row.outlineLevel = 1;
-            const rowIndex = row.number;
-            row.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
+        // Main Header with Branch Code and Category
+        const titleText = branchCode ? `Audit Stock Report (${cat}) สาขา ${branchCode}` : `Audit Stock Report (${cat})`;
+        const titleRow = worksheet.addRow([titleText]);
+        worksheet.mergeCells('A1:I1');
+        titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+        titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
+
+        // Table Headers
+        const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
+        headerRow.font = { bold: true };
+        headerRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+            cell.border = { bottom: { style: 'thin' } };
         });
 
-        // Add 2 blank rows for manual entry per Dept
-        for (let j = 0; j < 2; j++) {
-            // Correct array for 9 columns (A to I)
-            const blankRow = worksheet.addRow(["", "", "", "", "-", 0, null, null, null]);
-            blankRow.outlineLevel = 1;
-            const rowIndex = blankRow.number;
-            blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
+        Object.keys(groupedData).forEach(dept => {
+            const filteredItems = groupedData[dept].filter(item => item.category === cat);
+            if (filteredItems.length === 0) return;
 
-            // Add borders to blank row cells
-            blankRow.eachCell({ includeEmpty: true }, (cell) => {
-                cell.border = {
-                    top: { style: 'thin' },
-                    left: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                    right: { style: 'thin' }
-                };
+            // Add Dept Name Header Row (Styled with #404040 background and white text)
+            const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0, ""]);
+            deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // White Text
+            deptRow.eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } }; // Dark Gray
             });
-        }
 
-        const endRow = worksheet.rowCount;
+            const startRow = worksheet.rowCount + 1;
+            filteredItems.forEach(item => {
+                const row = worksheet.addRow([
+                    item.category,
+                    item.type,
+                    item.dept,
+                    item.code,
+                    item.description,
+                    item.balance,
+                    null,
+                    null,
+                    null
+                ]);
+                row.outlineLevel = 1;
+                const rowIndex = row.number;
+                row.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
+            });
 
-        // Set dynamic SUM formulas for System and Actual
-        deptRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
-        deptRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
+            // Add 2 blank rows for manual entry per Dept
+            for (let j = 0; j < 2; j++) {
+                const blankRow = worksheet.addRow(["", "", "", "", "-", 0, null, null, null]);
+                blankRow.outlineLevel = 1;
+                const rowIndex = blankRow.number;
+                blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
 
-        // Variance formula for Dept row: Actual (G) - System (F)
-        const deptRowIndex = deptRow.number;
-        deptRow.getCell(8).value = { formula: `G${deptRowIndex}-F${deptRowIndex}` };
+                // Add borders to blank row cells
+                blankRow.eachCell({ includeEmpty: true }, (cell) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+            }
+
+            const endRow = worksheet.rowCount;
+
+            // Set dynamic SUM formulas for System and Actual
+            deptRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
+            deptRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
+
+            // Variance formula for Dept row: Actual (G) - System (F)
+            const deptRowIndex = deptRow.number;
+            deptRow.getCell(8).value = { formula: `G${deptRowIndex}-F${deptRowIndex}` };
+        });
+
+        // Column Widths
+        worksheet.columns = [
+            { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
+        ];
     });
 
-    // Column Widths
-    worksheet.columns = [
-        { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
-    ];
+    // Filename logic: include current date (YYYYMMDD) in filename
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}${mm}${dd}`;
 
-    // Filename logic
-    const filename = branchCode ? `Audit_Stock_${branchCode}.xlsx` : 'Audit_Stock_Advanced.xlsx';
+    const cleanBranch = branchCode ? String(branchCode).trim() : '';
+    const filename = cleanBranch 
+        ? `Audit_Stock_${cleanBranch}_${dateStr}.xlsx` 
+        : `Audit_Stock_${dateStr}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), filename);
@@ -725,5 +845,9 @@ async function exportToExcel(branchCode) {
 
 downloadBtn.onclick = () => {
     const branchCode = prompt("กรุณากรอกรหัสสาขาเพื่อระบุในรายงานและชื่อไฟล์:");
+    if (branchCode === null) {
+        // Cancel download if user clicks Cancel
+        return;
+    }
     exportToExcel(branchCode);
 };
