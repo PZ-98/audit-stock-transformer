@@ -1,0 +1,17 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs at 12:00 UTC (19:00 Thai time) every Monday and Thursday
+    - cron: '0 12 * * 1,4'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  ping_db:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database Table
+        run: |
+          curl -X GET "https://qvuviyueajtchprbafbk.supabase.co/rest/v1/brand_mappings?select=original_name&limit=1" \
+          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"

@@ -248,6 +248,47 @@
         </div>
     </div>
 
+    <!-- Upload Success Modal -->
+    <div id="uploadSuccessModal" class="modal-popup">
+        <div class="modal-popup-content">
+            <div class="success-icon-wrapper">
+                <div class="success-icon-pulse"></div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="success-icon" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h2 class="popup-title">นำเข้าข้อมูลสำเร็จ!</h2>
+            <p class="popup-subtitle">ระบบได้อ่านและประมวลผลไฟล์เรียบร้อยแล้ว</p>
+
+            <div class="popup-details-container">
+                <div class="popup-detail-row">
+                    <span class="detail-label">ชื่อไฟล์:</span>
+                    <span id="popupFileName" class="detail-value text-truncate"></span>
+                </div>
+                <div class="popup-detail-row">
+                    <span class="detail-label">ขนาดไฟล์:</span>
+                    <span id="popupFileSize" class="detail-value"></span>
+                </div>
+                <div class="popup-detail-row">
+                    <span class="detail-label">รูปแบบข้อมูลที่พบ:</span>
+                    <span id="popupPattern" class="detail-value badge-pattern"></span>
+                </div>
+                <div class="popup-detail-row">
+                    <span class="detail-label">จำนวนแผนกที่พบ:</span>
+                    <span id="popupDeptCount" class="detail-value"></span>
+                </div>
+            </div>
+
+            <div class="popup-stats-title">สรุปตามหมวดหมู่สินค้า</div>
+            <div id="popupStatsList" class="popup-stats-list">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <button id="closePopupBtn" class="btn-primary" style="margin-top: 1rem;">ปิด</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 

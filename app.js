@@ -43,8 +43,6 @@ async function initSupabase() {
     if (url && key && typeof supabase !== 'undefined') {
         supabaseClient = supabase.createClient(url, key);
         await syncMappings();
-    } else {
-        console.warn("Supabase SDK not loaded or credentials missing.");
     }
 }
 
@@ -62,9 +60,7 @@ async function syncMappings() {
             newMappings[item.original_name] = item.replacement_name;
         });
         brandMappings = newMappings;
-        console.log("Mappings synced from Supabase:", Object.keys(brandMappings).length);
     } catch (err) {
-        console.error("Supabase sync error:", err);
         showToast(`Sync ล้มเหลว: ${err.message || 'โปรดตรวจสอบชื่อตาราง brand_mappings'}`, 'warning');
     }
 }
@@ -236,7 +232,6 @@ saveMappingBtn.onclick = async () => {
         adminModal.style.display = 'none';
         if (Object.keys(groupedData).length > 0) updatePreview();
     } catch (err) {
-        console.error("Save error:", err);
         alert('เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
     } finally {
         saveMappingBtn.textContent = "บันทึกลง Database (Supabase)";
@@ -246,11 +241,11 @@ saveMappingBtn.onclick = async () => {
 
 function getMappedName(category, rawDept, matCode) {
     if (!rawDept) rawDept = 'General';
-    
+
     // Clean rawDept (remove "Dept Name:" prefix and trim)
     let deptName = String(rawDept).replace(/Dept\s*Name:\s*/gi, '').trim();
     const cat = String(category || '').trim().toLowerCase();
-    
+
     if (cat === 'frame') {
         // If Group name = frame, lookup using Deptname from database (brandMappings)
         if (brandMappings[deptName]) {
@@ -274,52 +269,179 @@ function getMappedName(category, rawDept, matCode) {
     }
 }
 
+function formatFileBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const kilobytes = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const index = Math.floor(Math.log(bytes) / Math.log(kilobytes));
+    const formattedSize = parseFloat((bytes / Math.pow(kilobytes, index)).toFixed(2));
+    return `${formattedSize} ${sizes[index]}`;
+}
+
+function translatePatternType(type) {
+    if (type === 'LEGACY_DEPT_MARKER') {
+        return 'ตารางแยกแผนก (Legacy)';
+    }
+    if (type === 'FLAT_TABLE') {
+        return 'ตารางทั่วไป (Flat Table)';
+    }
+    return 'ไม่ระบุรูปแบบ';
+}
+
+function calculateCategoryStatistics(dataGroup) {
+    const stats = {};
+    TARGET_CATEGORIES.forEach(category => {
+        stats[category] = 0;
+    });
+
+    Object.values(dataGroup).forEach(items => {
+        items.forEach(item => {
+            if (stats[item.category] !== undefined) {
+                stats[item.category]++;
+            }
+        });
+    });
+    return stats;
+}
+
+function renderStatCard(category, count, container) {
+    if (count === 0) return;
+    const categoryColors = {
+        'Frame': '#4f46e5',
+        'Lens': '#10b981',
+        'Contactlens': '#f59e0b',
+        'Service': '#8b5cf6',
+        'Accessories': '#ec4899',
+        'น้ำยา': '#06b6d4'
+    };
+    const color = categoryColors[category] || '#64748b';
+    const card = document.createElement('div');
+    card.className = 'popup-stat-card';
+    card.innerHTML = `
+        <div class="stat-category-info">
+            <span class="stat-color-dot" style="background-color: ${color}"></span>
+            <span class="stat-cat-name">${category}</span>
+        </div>
+        <span class="stat-value">${count.toLocaleString()} ชิ้น</span>
+    `;
+    container.appendChild(card);
+}
+
+function showUploadSuccessPopup(fileName, fileSize, patternType, dataGroup) {
+    const modal = document.getElementById('uploadSuccessModal');
+    const nameSpan = document.getElementById('popupFileName');
+    const sizeSpan = document.getElementById('popupFileSize');
+    const patternSpan = document.getElementById('popupPattern');
+    const deptSpan = document.getElementById('popupDeptCount');
+    const statsList = document.getElementById('popupStatsList');
+    const closeBtn = document.getElementById('closePopupBtn');
+
+    nameSpan.textContent = fileName;
+    sizeSpan.textContent = formatFileBytes(fileSize);
+    patternSpan.textContent = translatePatternType(patternType);
+    deptSpan.textContent = Object.keys(dataGroup).length.toString();
+
+    statsList.innerHTML = '';
+    const stats = calculateCategoryStatistics(dataGroup);
+    Object.entries(stats).forEach(([category, count]) => {
+        renderStatCard(category, count, statsList);
+    });
+
+    modal.style.display = 'flex';
+    closeBtn.onclick = () => {
+        modal.style.display = 'none';
+        const filterElement = document.getElementById('filterSection');
+        if (filterElement) {
+            filterElement.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+}
+
+function renderUploadZoneActive(fileName) {
+    dropZone.classList.add('active-file');
+    dropZone.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none"
+            stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            style="margin-bottom: 1rem;">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <p style="font-weight: 600; color: #10b981; margin-bottom: 0.5rem;">กำลังใช้งานไฟล์:</p>
+        <p id="activeFileName" style="font-weight: 700; color: var(--text-main); font-size: 1.1rem; margin-bottom: 1rem;" class="text-truncate">${fileName}</p>
+        <button type="button" id="changeFileBtn" class="btn-secondary" style="display: inline-block; width: auto; padding: 0.5rem 1.5rem;">เปลี่ยนไฟล์</button>
+    `;
+    const btn = document.getElementById('changeFileBtn');
+    btn.onclick = (e) => {
+        e.stopPropagation();
+        fileInput.click();
+    };
+}
+
+function renderUploadZoneInactive() {
+    dropZone.classList.remove('active-file');
+    dropZone.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none"
+            stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            style="margin-bottom: 1rem;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <p style="font-weight: 600;">ลากไฟล์ .xls หรือ .xlsx มาวางที่นี่</p>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">
+            หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์ของคุณ</p>
+    `;
+}
+
+function renderUploadZoneLoading() {
+    dropZone.style.opacity = "0.6";
+    dropZone.style.pointerEvents = "none";
+    dropZone.innerHTML = `
+        <p style="font-weight: 600;">⌛ กำลังประมวลผลไฟล์... (Processing)</p>
+    `;
+}
+
+function restoreUploadZoneEvents() {
+    dropZone.style.opacity = "1";
+    dropZone.style.pointerEvents = "all";
+}
+
+function parseAndProcessExcel(file, arrayBuffer) {
+    try {
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const result = detectPattern(json);
+
+        if (result && result.type) {
+            processRawData(json, result, file.name, file.size);
+            renderUploadZoneActive(file.name);
+            return;
+        }
+        showFormatError(result ? result.missingColumns : []);
+        renderUploadZoneInactive();
+    } catch (err) {
+        showError();
+        renderUploadZoneInactive();
+    }
+}
+
 async function handleFile(file) {
     if (!file) return;
 
-    // Visual Loading State
-    const dropZoneText = dropZone.querySelector('p');
-    const originalText = dropZoneText.textContent;
-    dropZoneText.textContent = "⌛ กำลังประมวลผลไฟล์... (Processing)";
-    dropZone.style.opacity = "0.6";
-    dropZone.style.pointerEvents = "none";
-
     resetState();
+    renderUploadZoneLoading();
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-            console.log("File loaded, rows:", json.length);
-            const result = detectPattern(json);
-
-            if (result && result.type) {
-                console.log("Pattern detected:", result.type, result.mapping);
-                processRawData(json, result);
-            } else {
-                console.warn("No pattern detected.", result);
-                showFormatError(result ? result.missingColumns : []);
-            }
-        } catch (err) {
-            console.error("Error processing file:", err);
-            showError();
-        } finally {
-            // Restore UI
-            dropZoneText.textContent = originalText;
-            dropZone.style.opacity = "1";
-            dropZone.style.pointerEvents = "all";
-        }
+        parseAndProcessExcel(file, e.target.result);
+        restoreUploadZoneEvents();
     };
     reader.onerror = () => {
         showError();
-        dropZoneText.textContent = originalText;
-        dropZone.style.opacity = "1";
-        dropZone.style.pointerEvents = "all";
+        restoreUploadZoneEvents();
+        renderUploadZoneInactive();
     };
     reader.readAsArrayBuffer(file);
 }
@@ -479,79 +601,95 @@ function resetState() {
     filterSection.style.display = 'none';
     previewSection.style.display = 'none';
     previewTableBody.innerHTML = '';
+    renderUploadZoneInactive();
 }
 
-function processRawData(rows, result) {
+function processLegacyRow(row, currentDeptState) {
+    if (!row || row.length === 0) return;
+    const firstCell = String(row[0] || '').trim();
+
+    if (firstCell.startsWith('Dept Name:')) {
+        currentDeptState.name = firstCell.replace(/Dept\s*Name:\s*/gi, '').trim();
+        return;
+    }
+
+    if (!currentDeptState.name || !row[3] || !row[0]) return;
+
+    const rawCat = String(row[0] || '').trim();
+    const cat = CATEGORY_MAP[rawCat] || rawCat;
+    const balance = parseFloat(row[15]) || 0;
+    if (balance === 0) return;
+
+    const code = String(row[3]).trim();
+    const finalDeptName = getMappedName(cat, currentDeptState.name, code);
+
+    if (!groupedData[finalDeptName]) {
+        groupedData[finalDeptName] = [];
+    }
+
+    groupedData[finalDeptName].push({
+        category: cat,
+        type: row[1],
+        dept: finalDeptName,
+        code: code,
+        description: row[4],
+        balance: balance
+    });
+}
+
+function processLegacyData(rows) {
+    const currentDeptState = { name: null };
+    rows.forEach(row => {
+        processLegacyRow(row, currentDeptState);
+    });
+}
+
+function processFlatTableRow(row, mapping) {
+    if (!row || !row[mapping.code]) return;
+
+    const rawCat = mapping.groupName !== undefined ? String(row[mapping.groupName] || '').trim() : '';
+    const cat = CATEGORY_MAP[rawCat] || rawCat;
+    const balance = parseFloat(row[mapping.balance]) || 0;
+    if (balance === 0) return;
+
+    const rawDept = mapping.dept !== undefined ? String(row[mapping.dept] || '').trim() : 'General';
+    const code = String(row[mapping.code]).trim();
+    const finalDeptName = getMappedName(cat, rawDept, code);
+
+    if (!groupedData[finalDeptName]) {
+        groupedData[finalDeptName] = [];
+    }
+
+    groupedData[finalDeptName].push({
+        category: cat,
+        type: mapping.groupCode !== undefined ? String(row[mapping.groupCode] || '').trim() : '',
+        dept: finalDeptName,
+        code: code,
+        description: String(row[mapping.name] || '').trim(),
+        balance: balance
+    });
+}
+
+function processFlatTableData(rows, result) {
+    const { headerRowIndex, mapping } = result;
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+        processFlatTableRow(rows[i], mapping);
+    }
+}
+
+function processRawData(rows, result, fileName, fileSize) {
     groupedData = {};
     const pattern = result.type;
 
     if (pattern === 'LEGACY_DEPT_MARKER') {
-        let currentDeptRaw = null;
-        rows.forEach(row => {
-            if (!row || row.length === 0) return;
-            const firstCell = String(row[0] || '').trim();
-
-            if (firstCell.startsWith('Dept Name:')) {
-                currentDeptRaw = firstCell.replace(/Dept\s*Name:\s*/gi, '').trim();
-            }
-            else if (currentDeptRaw && row[3] && row[0]) {
-                let rawCat = String(row[0] || '').trim();
-                let cat = CATEGORY_MAP[rawCat] || rawCat;
-                let balance = parseFloat(row[15]) || 0;
-
-                if (balance === 0) return;
-
-                let code = String(row[3]).trim();
-                let finalDeptName = getMappedName(cat, currentDeptRaw, code);
-
-                if (!groupedData[finalDeptName]) {
-                    groupedData[finalDeptName] = [];
-                }
-
-                groupedData[finalDeptName].push({
-                    category: cat,
-                    type: row[1],
-                    dept: finalDeptName,
-                    code: code,
-                    description: row[4],
-                    balance: balance
-                });
-            }
-        });
+        processLegacyData(rows);
     } else if (pattern === 'FLAT_TABLE') {
-        const { headerRowIndex, mapping } = result;
-
-        for (let i = headerRowIndex + 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || !row[mapping.code]) continue;
-
-            let rawCat = mapping.groupName !== undefined ? String(row[mapping.groupName] || '').trim() : '';
-            let cat = CATEGORY_MAP[rawCat] || rawCat;
-            let balance = parseFloat(row[mapping.balance]) || 0;
-
-            if (balance === 0) continue; // Fix: use continue instead of return to skip 0 balance items
-
-            const rawDept = mapping.dept !== undefined ? String(row[mapping.dept] || '').trim() : 'General';
-            const code = String(row[mapping.code]).trim();
-            const finalDeptName = getMappedName(cat, rawDept, code);
-
-            if (!groupedData[finalDeptName]) {
-                groupedData[finalDeptName] = [];
-            }
-
-            groupedData[finalDeptName].push({
-                category: cat,
-                type: mapping.groupCode !== undefined ? String(row[mapping.groupCode] || '').trim() : '',
-                dept: finalDeptName,
-                code: code,
-                description: String(row[mapping.name] || '').trim(),
-                balance: balance
-            });
-        }
+        processFlatTableData(rows, result);
     }
 
     renderFilters();
     updatePreview();
+    showUploadSuccessPopup(fileName, fileSize, pattern, groupedData);
 }
 
 function renderFilters() {
@@ -835,8 +973,8 @@ async function exportToExcel(branchCode) {
     const dateStr = `${yyyy}${mm}${dd}`;
 
     const cleanBranch = branchCode ? String(branchCode).trim() : '';
-    const filename = cleanBranch 
-        ? `Audit_Stock_${cleanBranch}_${dateStr}.xlsx` 
+    const filename = cleanBranch
+        ? `Audit_Stock_${cleanBranch}_${dateStr}.xlsx`
         : `Audit_Stock_${dateStr}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
