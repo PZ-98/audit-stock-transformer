@@ -1,5 +1,11 @@
 let groupedData = {};
-let selectedCategories = new Set(["Frame", "Lens", "Contactlens", "Service", "Accessories", "น้ำยา"]);
+let selectedCategories = new Set(["Frame", "Lens", "Contactlens", "Accessories", "น้ำยา", "ไม่พบข้อมูลสินค้า"]);
+
+// Raw Stock State Variables (for re-processing upon scan file updates)
+let rawStockRows = null;
+let rawStockResult = null;
+let rawStockFileName = '';
+let rawStockFileSize = 0;
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -92,8 +98,6 @@ dropZone.ondrop = (e) => {
     dropZone.classList.remove('dragover');
     if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 };
-
-// Search Logic removed
 
 // Admin Logic
 adminBtn.onclick = () => {
@@ -290,14 +294,15 @@ function translatePatternType(type) {
 
 function calculateCategoryStatistics(dataGroup) {
     const stats = {};
-    TARGET_CATEGORIES.forEach(category => {
+    const categoriesToCount = [...TARGET_CATEGORIES, 'ไม่พบข้อมูลสินค้า'];
+    categoriesToCount.forEach(category => {
         stats[category] = 0;
     });
 
     Object.values(dataGroup).forEach(items => {
         items.forEach(item => {
             if (stats[item.category] !== undefined) {
-                stats[item.category]++;
+                stats[item.category] += item.balance;
             }
         });
     });
@@ -312,7 +317,8 @@ function renderStatCard(category, count, container) {
         'Contactlens': '#f59e0b',
         'Service': '#8b5cf6',
         'Accessories': '#ec4899',
-        'น้ำยา': '#06b6d4'
+        'น้ำยา': '#06b6d4',
+        'ไม่พบข้อมูลสินค้า': '#64748b'
     };
     const color = categoryColors[category] || '#64748b';
     const card = document.createElement('div');
@@ -594,6 +600,10 @@ function showToast(message, type = 'info') {
 
 function resetState() {
     groupedData = {};
+    rawStockRows = null;
+    rawStockResult = null;
+    rawStockFileName = '';
+    rawStockFileSize = 0;
     activePreviewTab = 'All';
     previewTabBar.innerHTML = '';
     previewTabBar.style.display = 'none';
@@ -678,23 +688,37 @@ function processFlatTableData(rows, result) {
 }
 
 function processRawData(rows, result, fileName, fileSize) {
+    rawStockRows = rows;
+    rawStockResult = result;
+    rawStockFileName = fileName;
+    rawStockFileSize = fileSize;
+    rebuildGroupedData();
+    showUploadSuccessPopup(fileName, fileSize, rawStockResult.type, groupedData);
+}
+
+function rebuildGroupedData() {
+    if (!rawStockRows || !rawStockResult) return;
     groupedData = {};
-    const pattern = result.type;
-
+    const pattern = rawStockResult.type;
     if (pattern === 'LEGACY_DEPT_MARKER') {
-        processLegacyData(rows);
+        processLegacyData(rawStockRows);
     } else if (pattern === 'FLAT_TABLE') {
-        processFlatTableData(rows, result);
+        processFlatTableData(rawStockRows, rawStockResult);
     }
-
     renderFilters();
     updatePreview();
-    showUploadSuccessPopup(fileName, fileSize, pattern, groupedData);
 }
 
 function renderFilters() {
     groupList.innerHTML = '';
-    TARGET_CATEGORIES.forEach(cat => {
+    const activeFilterCategories = [...TARGET_CATEGORIES];
+    const hasUnmatched = Object.values(groupedData).some(items =>
+        items.some(item => item.category === 'ไม่พบข้อมูลสินค้า')
+    );
+    if (hasUnmatched) activeFilterCategories.push('ไม่พบข้อมูลสินค้า');
+
+    activeFilterCategories.forEach(cat => {
+        if (cat === 'Service') return; // Hide Service option
         const div = document.createElement('div');
         div.className = 'group-item';
         div.innerHTML = `
@@ -729,263 +753,393 @@ document.getElementById('deselectAll').onclick = () => {
 
 function updatePreview() {
     previewTableBody.innerHTML = '';
-    let rowCount = 0;
-
-    // Find all categories that actually have data
-    const categoriesWithData = new Set();
-    Object.values(groupedData).forEach(items => {
-        items.forEach(item => {
-            if (selectedCategories.has(item.category)) {
-                categoriesWithData.add(item.category);
-            }
-        });
-    });
-
+    const categoriesWithData = getCategoriesWithData();
     const activeCategories = Array.from(categoriesWithData);
 
-    // Keep active preview tab in check
     if (activePreviewTab !== 'All' && !categoriesWithData.has(activePreviewTab)) {
         activePreviewTab = 'All';
     }
 
-    // Render Tab Bar if there are multiple active categories
-    if (activeCategories.length > 1) {
-        previewTabBar.innerHTML = '';
-        previewTabBar.style.display = 'flex';
+    renderPreviewTabBar(activeCategories);
+    const rowCount = renderPreviewRows();
+    previewSection.style.display = rowCount > 0 ? 'block' : 'none';
+}
 
-        // 1. All tab
-        const totalItemsCount = Object.values(groupedData).reduce((sum, items) => {
-            return sum + items.filter(item => selectedCategories.has(item.category)).length;
-        }, 0);
-
-        const allTab = document.createElement('div');
-        allTab.className = `preview-tab ${activePreviewTab === 'All' ? 'active' : ''}`;
-        allTab.innerHTML = `ทั้งหมด <span class="count-badge">${totalItemsCount}</span>`;
-        allTab.onclick = () => {
-            activePreviewTab = 'All';
-            updatePreview();
-        };
-        previewTabBar.appendChild(allTab);
-
-        // 2. Individual product tabs
-        activeCategories.forEach(cat => {
-            const catItemsCount = Object.values(groupedData).reduce((sum, items) => {
-                return sum + items.filter(item => item.category === cat).length;
-            }, 0);
-
-            const tab = document.createElement('div');
-            tab.className = `preview-tab ${activePreviewTab === cat ? 'active' : ''}`;
-            tab.innerHTML = `${cat} <span class="count-badge">${catItemsCount}</span>`;
-            tab.onclick = () => {
-                activePreviewTab = cat;
-                updatePreview();
-            };
-            previewTabBar.appendChild(tab);
-        });
-    } else {
-        previewTabBar.style.display = 'none';
-        activePreviewTab = 'All';
-    }
-
-    Object.keys(groupedData).forEach(dept => {
-        let filteredItems = groupedData[dept].filter(item => {
-            if (activePreviewTab === 'All') {
-                return selectedCategories.has(item.category);
-            } else {
-                return item.category === activePreviewTab;
+function getCategoriesWithData() {
+    const categories = new Set();
+    Object.values(groupedData).forEach(items => {
+        items.forEach(item => {
+            if (selectedCategories.has(item.category)) {
+                categories.add(item.category);
             }
         });
+    });
+    return categories;
+}
 
+function renderPreviewTabBar(activeCategories) {
+    if (activeCategories.length <= 1) {
+        previewTabBar.style.display = 'none';
+        activePreviewTab = 'All';
+        return;
+    }
+    previewTabBar.innerHTML = '';
+    previewTabBar.style.display = 'flex';
+    renderAllTabButton();
+    activeCategories.forEach(renderCategoryTabButton);
+}
+
+function renderAllTabButton() {
+    const totalItemsCount = Object.values(groupedData).reduce((sum, items) => {
+        return sum + items
+            .filter(item => selectedCategories.has(item.category))
+            .reduce((itemSum, item) => itemSum + item.balance, 0);
+    }, 0);
+    const allTab = document.createElement('div');
+    allTab.className = `preview-tab ${activePreviewTab === 'All' ? 'active' : ''}`;
+    allTab.innerHTML = `ทั้งหมด <span class="count-badge">${totalItemsCount}</span>`;
+    allTab.onclick = () => {
+        activePreviewTab = 'All';
+        updatePreview();
+    };
+    previewTabBar.appendChild(allTab);
+}
+
+function renderCategoryTabButton(cat) {
+    const catItemsCount = Object.values(groupedData).reduce((sum, items) => {
+        return sum + items
+            .filter(item => item.category === cat)
+            .reduce((itemSum, item) => itemSum + item.balance, 0);
+    }, 0);
+    const tab = document.createElement('div');
+    tab.className = `preview-tab ${activePreviewTab === cat ? 'active' : ''}`;
+    tab.innerHTML = `${cat} <span class="count-badge">${catItemsCount}</span>`;
+    tab.onclick = () => {
+        activePreviewTab = cat;
+        updatePreview();
+    };
+    previewTabBar.appendChild(tab);
+}
+
+function renderPreviewRows() {
+    let rowCount = 0;
+    Object.keys(groupedData).forEach(dept => {
+        const filteredItems = groupedData[dept].filter(isItemInActiveTab);
         if (filteredItems.length === 0) return;
-
-        const subtotal = filteredItems.reduce((sum, item) => sum + item.balance, 0);
-
-        const headerTr = document.createElement('tr');
-        headerTr.className = 'dept-row';
-        headerTr.innerHTML = `
-            <td colspan="5">Dept Name: ${dept}</td>
-            <td>${subtotal.toLocaleString()}</td>
-            <td></td>
-            <td></td>
-            <td></td>
-        `;
-        previewTableBody.appendChild(headerTr);
-
+        renderDeptHeaderRow(dept, filteredItems);
         filteredItems.forEach(item => {
             rowCount++;
-            if (rowCount > 100) return; // Limit preview for performance
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.category}</td>
-                <td>${item.type}</td>
-                <td>${item.dept}</td>
-                <td>${item.code}</td>
-                <td>${item.description}</td>
-                <td>${item.balance.toLocaleString()}</td>
-                <td></td>
-                <td></td>
-                <td></td>
-            `;
-            previewTableBody.appendChild(tr);
+            if (rowCount > 100) return;
+            renderItemRow(item);
         });
     });
+    return rowCount;
+}
 
-    previewSection.style.display = rowCount > 0 ? 'block' : 'none';
+function isItemInActiveTab(item) {
+    if (activePreviewTab === 'All') {
+        return selectedCategories.has(item.category);
+    }
+    return item.category === activePreviewTab;
+}
+
+function renderDeptHeaderRow(dept, filteredItems) {
+    const systemSubtotal = filteredItems.reduce((sum, item) => sum + item.balance, 0);
+    const actualSubtotal = filteredItems.reduce((sum, item) => sum + (item.actualCount || 0), 0);
+    const hasScanData = filteredItems.some(item => item.actualCount !== undefined && item.actualCount !== null);
+    const actualText = hasScanData ? actualSubtotal.toLocaleString() : '';
+    const varianceText = hasScanData ? (actualSubtotal - systemSubtotal).toLocaleString() : '';
+    const headerTr = document.createElement('tr');
+    headerTr.className = 'dept-row';
+    headerTr.innerHTML = `
+        <td colspan="5">Dept Name: ${dept}</td>
+        <td>${systemSubtotal.toLocaleString()}</td>
+        <td>${actualText}</td>
+        <td>${varianceText}</td>
+        <td></td>
+    `;
+    previewTableBody.appendChild(headerTr);
+}
+
+function renderItemRow(item) {
+    const hasActual = item.actualCount !== undefined && item.actualCount !== null;
+    const actualText = hasActual ? item.actualCount.toLocaleString() : '';
+    const varianceText = hasActual ? (item.actualCount - item.balance).toLocaleString() : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${item.category}</td>
+        <td>${item.type}</td>
+        <td>${item.dept}</td>
+        <td>${item.code}</td>
+        <td>${item.description}</td>
+        <td>${item.balance.toLocaleString()}</td>
+        <td>${actualText}</td>
+        <td>${varianceText}</td>
+        <td></td>
+    `;
+    previewTableBody.appendChild(tr);
 }
 
 async function exportToExcel(branchCode) {
     const workbook = new ExcelJS.Workbook();
+    createInstructionSheet(workbook);
+    createScanSheet(workbook);
 
-    // 1. Instruction Sheet (First Tab)
-    const insSheet = workbook.addWorksheet('คู่มือการใช้งาน', { properties: { tabColor: { argb: 'FFFF0000' } } });
-    insSheet.columns = [{ width: 5 }, { width: 80 }];
-
-    const insTitle = insSheet.addRow(["", "คู่มือการใช้งานไฟล์ Audit Stock"]);
-    insTitle.font = { size: 18, bold: true, color: { argb: 'FF4F46E5' } };
-    insSheet.addRow([]); // Blank
-
-    const instructions = [
-        "1. ตรวจสอบข้อมูลแผนกและหมวดหมู่สินค้าในแต่ละแท็บ (เช่น Frame, Lens, Contactlens)",
-        "2. กรอกจำนวนสินค้าที่นับได้จริงในคอลัมน์ 'Actual Count' (ช่องสีขาว)",
-        "3. ระบบจะคำนวณผลต่าง (Variance) ให้โดยอัตโนมัติในคอลัมน์ 'Variance'",
-        "4. การจัดการในรูปแบบ Group: สามารถใช้เครื่องหมาย (+) และ (-) ทางด้านซ้ายมือเพื่อย่อหรือขยายรายละเอียดในแต่ละ Group ได้",
-        "5. ยอดรวมตาม Group: บรรทัดสีเทาเข้มจะแสดงผลรวมของสินค้าใน Group นั้นๆ ซึ่งจะขยับตามจำนวนที่คุณกรอกจริง"
-    ];
-
-    instructions.forEach((text, i) => {
-        const row = insSheet.addRow(["", text]);
-        row.font = { size: 12 };
-        if (i === 1) row.getCell(2).font = { size: 12, bold: true, color: { argb: 'FFFF0000' } };
-        insSheet.addRow([]); // Space between points
-    });
-
-    // 2. Audit Sheets (Separate Tab for each Category)
     const activeCategories = Array.from(selectedCategories).filter(cat => {
         return Object.values(groupedData).some(items => items.some(item => item.category === cat));
     });
 
     activeCategories.forEach(cat => {
-        // Slick, harmonious brand-specific tab colors
-        let tabColor = 'FF4F46E5'; // Default: Indigo
-        if (cat === 'Frame') tabColor = 'FF4F46E5';
-        else if (cat === 'Lens') tabColor = 'FF10B981'; // Emerald
-        else if (cat === 'Contactlens') tabColor = 'FFF59E0B'; // Amber
-        else if (cat === 'Service') tabColor = 'FF8B5CF6'; // Purple
-        else if (cat === 'Accessories') tabColor = 'FFEC4899'; // Pink
-        else if (cat === 'น้ำยา') tabColor = 'FF06B6D4'; // Cyan
-
-        const worksheet = workbook.addWorksheet(cat, {
-            views: [{ state: 'frozen', ySplit: 2 }],
-            properties: {
-                tabColor: { argb: tabColor },
-                outlineLevelCol: 0,
-                outlineLevelRow: 1,
-                outlineProperties: { summaryBelow: false }
-            }
-        });
-
-        // Main Header with Branch Code and Category
-        const titleText = branchCode ? `Audit Stock Report (${cat}) สาขา ${branchCode}` : `Audit Stock Report (${cat})`;
-        const titleRow = worksheet.addRow([titleText]);
-        worksheet.mergeCells('A1:I1');
-        titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-        titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
-        titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
-
-        // Table Headers
-        const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
-        headerRow.font = { bold: true };
-        headerRow.eachCell(cell => {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
-            cell.border = { bottom: { style: 'thin' } };
-        });
-
-        Object.keys(groupedData).forEach(dept => {
-            const filteredItems = groupedData[dept].filter(item => item.category === cat);
-            if (filteredItems.length === 0) return;
-
-            // Add Dept Name Header Row (Styled with #404040 background and white text)
-            const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0, ""]);
-            deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // White Text
-            deptRow.eachCell(cell => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } }; // Dark Gray
-            });
-
-            const startRow = worksheet.rowCount + 1;
-            filteredItems.forEach(item => {
-                const row = worksheet.addRow([
-                    item.category,
-                    item.type,
-                    item.dept,
-                    item.code,
-                    item.description,
-                    item.balance,
-                    null,
-                    null,
-                    null
-                ]);
-                row.outlineLevel = 1;
-                const rowIndex = row.number;
-                row.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
-            });
-
-            // Add 2 blank rows for manual entry per Dept
-            for (let j = 0; j < 2; j++) {
-                const blankRow = worksheet.addRow(["", "", "", "", "-", 0, null, null, null]);
-                blankRow.outlineLevel = 1;
-                const rowIndex = blankRow.number;
-                blankRow.getCell(8).value = { formula: `G${rowIndex}-F${rowIndex}` };
-
-                // Add borders to blank row cells
-                blankRow.eachCell({ includeEmpty: true }, (cell) => {
-                    cell.border = {
-                        top: { style: 'thin' },
-                        left: { style: 'thin' },
-                        bottom: { style: 'thin' },
-                        right: { style: 'thin' }
-                    };
-                });
-            }
-
-            const endRow = worksheet.rowCount;
-
-            // Set dynamic SUM formulas for System and Actual
-            deptRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
-            deptRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
-
-            // Variance formula for Dept row: Actual (G) - System (F)
-            const deptRowIndex = deptRow.number;
-            deptRow.getCell(8).value = { formula: `G${deptRowIndex}-F${deptRowIndex}` };
-        });
-
-        // Column Widths
-        worksheet.columns = [
-            { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
-        ];
+        createCategorySheet(workbook, cat, branchCode);
     });
 
-    // Filename logic: include current date (YYYYMMDD) in filename
+    const filename = getExportFilename(branchCode);
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), filename);
+}
+
+function createScanSheet(workbook) {
+    const scanSheet = workbook.addWorksheet('สแกน', { properties: { tabColor: { argb: '#5c5c5c' } } });
+    scanSheet.columns = [
+        { header: 'รายการสแกน (Barcode)', key: 'barcode', width: 25 },
+        { header: 'สถานะ / รายละเอียดสินค้า', key: 'status', width: 45 }
+    ];
+    const headerRow = scanSheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+    headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+    headerRow.getCell(1).border = { bottom: { style: 'thin' } };
+    headerRow.getCell(2).border = { bottom: { style: 'thin' } };
+
+    for (let r = 2; r <= 5000; r++) {
+        const row = scanSheet.getRow(r);
+        row.getCell(2).value = { formula: `IF(A${r}="","",_xlfn.XLOOKUP(A${r},'Frame'!D:D,'Frame'!E:E,"ไม่พบข้อมูล"))` };
+    }
+}
+
+function createInstructionSheet(workbook) {
+    const insSheet = workbook.addWorksheet('คู่มือการใช้งาน', { properties: { tabColor: { argb: 'FFFF0000' } } });
+    insSheet.columns = [{ width: 5 }, { width: 80 }];
+    const insTitle = insSheet.addRow(["", "คู่มือการใช้งานไฟล์ Audit Stock"]);
+    insTitle.font = { size: 18, bold: true, color: { argb: 'FF4F46E5' } };
+    insSheet.addRow([]);
+
+    const instructions = [
+        "1. ตรวจสอบข้อมูลแผนกและหมวดหมู่สินค้าในแต่ละแท็บ (เช่น Frame, Lens, Contactlens)",
+        "2. สำหรับสินค้าหมวดแว่น (Frame): ให้สลับไปที่แท็บ 'สแกน' แล้วใช้เครื่องสแกนยิงบาร์โค้ดลงในคอลัมน์ A (รายการสแกน) ได้ทันที",
+        "3. ในแท็บ 'สแกน' คอลัมน์ B จะแสดงชื่อสินค้าโดยอัตโนมัติ หากบาร์โค้ดนั้นไม่มีอยู่ในสต็อกจะขึ้นแจ้งเตือนว่า 'ไม่พบข้อมูล'",
+        "4. จำนวนที่ยิงสแกนได้ในแท็บ 'สแกน' จะถูกนำไปคำนวณและป้อนในคอลัมน์ 'Actual Count' ของแท็บ 'Frame' ให้โดยอัตโนมัติ",
+        "5. สำหรับสินค้าหมวดอื่นๆ (Lens, Contactlens, Accessories, น้ำยา): ให้ใช้วิธีนับมือแล้วกรอกลงในคอลัมน์ 'Actual Count' (ช่องสีขาว)",
+        "6. ระบบจะคำนวณผลต่าง (Variance) และยอดรวมแยกตามแผนก/กลุ่มสินค้าให้โดยอัตโนมัติ",
+        "7. การจัดการรูปแบบ Group: สามารถใช้เครื่องหมาย (+) และ (-) ทางด้านซ้ายมือเพื่อย่อหรือขยายรายละเอียดในแต่ละแผนกได้"
+    ];
+    instructions.forEach((text, i) => {
+        const row = insSheet.addRow(["", text]);
+        row.font = { size: 12 };
+        if (i === 1 || i === 2 || i === 3) {
+            row.getCell(2).font = { size: 12, bold: true, color: { argb: 'FF4F46E5' } };
+        }
+        insSheet.addRow([]);
+    });
+}
+
+function getCategoryTabColor(cat) {
+    const tabColors = {
+        'Frame': 'FF4F46E5',
+        'Lens': 'FF10B981',
+        'Contactlens': 'FFF59E0B',
+        'Service': 'FF8B5CF6',
+        'Accessories': 'FFEC4899',
+        'น้ำยา': 'FF06B6D4',
+        'ไม่พบข้อมูลสินค้า': 'FF64748B'
+    };
+    return tabColors[cat] || 'FF4F46E5';
+}
+
+function createCategorySheet(workbook, cat, branchCode) {
+    const tabColor = getCategoryTabColor(cat);
+    const worksheet = workbook.addWorksheet(cat, {
+        views: [{ state: 'frozen', ySplit: 2 }],
+        properties: {
+            tabColor: { argb: tabColor },
+            outlineLevelCol: 0,
+            outlineLevelRow: 1,
+            outlineProperties: { summaryBelow: false }
+        }
+    });
+    setupSheetHeaders(worksheet, cat, branchCode, tabColor);
+    populateSheetData(worksheet, cat);
+    worksheet.columns = [
+        { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
+    ];
+}
+
+function setupSheetHeaders(worksheet, cat, branchCode, tabColor) {
+    const titleText = branchCode ? `Audit Stock Report (${cat}) สาขา ${branchCode}` : `Audit Stock Report (${cat})`;
+    const titleRow = worksheet.addRow([titleText]);
+    worksheet.mergeCells('A1:I1');
+    titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
+
+    const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
+    headerRow.font = { bold: true };
+    headerRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+        cell.border = { bottom: { style: 'thin' } };
+    });
+}
+
+function populateSheetData(worksheet, cat) {
+    Object.keys(groupedData).forEach(dept => {
+        const filteredItems = groupedData[dept].filter(item => item.category === cat);
+        if (filteredItems.length === 0) return;
+
+        const deptRow = worksheet.addRow([`Dept Name: ${dept}`, "", "", "", "", 0, 0, 0, ""]);
+        deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        deptRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } };
+        });
+
+        const startRow = worksheet.rowCount + 1;
+        filteredItems.forEach(item => {
+            const row = worksheet.addRow([
+                item.category, item.type, item.dept, item.code, item.description,
+                item.balance, null, null, null
+            ]);
+            row.outlineLevel = 1;
+            if (cat === 'Frame') {
+                row.getCell(7).value = { formula: `COUNTIF('สแกน'!A:A, D${row.number})` };
+            } else {
+                row.getCell(7).value = item.actualCount !== undefined && item.actualCount !== null ? item.actualCount : null;
+            }
+            row.getCell(8).value = { formula: `G${row.number}-F${row.number}` };
+        });
+
+        addBlankRowsForDept(worksheet);
+        const endRow = worksheet.rowCount;
+        deptRow.getCell(6).value = { formula: `SUM(F${startRow}:F${endRow})` };
+        deptRow.getCell(7).value = { formula: `SUM(G${startRow}:G${endRow})` };
+        deptRow.getCell(8).value = { formula: `G${deptRow.number}-F${deptRow.number}` };
+    });
+}
+
+function addBlankRowsForDept(worksheet) {
+    for (let j = 0; j < 2; j++) {
+        const blankRow = worksheet.addRow(["", "", "", "", "-", 0, null, null, null]);
+        blankRow.outlineLevel = 1;
+        blankRow.getCell(8).value = { formula: `G${blankRow.number}-F${blankRow.number}` };
+
+        blankRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.border = {
+                top: { style: 'thin' }, left: { style: 'thin' },
+                bottom: { style: 'thin' }, right: { style: 'thin' }
+            };
+        });
+    }
+}
+
+function getExportFilename(branchCode) {
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}${mm}${dd}`;
-
     const cleanBranch = branchCode ? String(branchCode).trim() : '';
-    const filename = cleanBranch
+    return cleanBranch
         ? `Audit_Stock_${cleanBranch}_${dateStr}.xlsx`
         : `Audit_Stock_${dateStr}.xlsx`;
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), filename);
 }
 
+const branchCodeModal = document.getElementById('branchCodeModal');
+const branchInput = document.getElementById('branchInput');
+const branchInputError = document.getElementById('branchInputError');
+const cancelBranchBtn = document.getElementById('cancelBranchBtn');
+const submitBranchBtn = document.getElementById('submitBranchBtn');
+
 downloadBtn.onclick = () => {
-    const branchCode = prompt("กรุณากรอกรหัสสาขาเพื่อระบุในรายงานและชื่อไฟล์:");
-    if (branchCode === null) {
-        // Cancel download if user clicks Cancel
-        return;
+    if (branchCodeModal && branchInput) {
+        branchInput.value = '';
+        branchInputError.style.display = 'none';
+        submitBranchBtn.disabled = true;
+        branchCodeModal.style.display = 'flex';
+        setTimeout(() => branchInput.focus(), 100);
     }
-    exportToExcel(branchCode);
 };
+
+if (branchCodeModal) {
+    cancelBranchBtn.onclick = () => {
+        branchCodeModal.style.display = 'none';
+    };
+
+    branchInput.addEventListener('input', (e) => {
+        let value = e.target.value;
+        const cleaned = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+        if (value !== cleaned) {
+            e.target.value = cleaned;
+            value = cleaned;
+            branchInputError.textContent = "⚠️ กรุณากรอกเฉพาะภาษาอังกฤษและตัวเลขเท่านั้น";
+            branchInputError.style.display = 'block';
+            return;
+        }
+
+        const pattern = /^[BM]\d{4}$/;
+        if (value.length === 0) {
+            branchInputError.style.display = 'none';
+            submitBranchBtn.disabled = true;
+        } else if (!/^[BM]/i.test(value)) {
+            branchInputError.textContent = "❌ ต้องขึ้นต้นด้วยตัวอักษร B หรือ M เท่านั้น";
+            branchInputError.style.display = 'block';
+            submitBranchBtn.disabled = true;
+        } else if (value.length < 5) {
+            branchInputError.textContent = "❌ ต้องระบุตัวเลขตามหลังอีก 4 หลัก (เช่น B0001)";
+            branchInputError.style.display = 'block';
+            submitBranchBtn.disabled = true;
+        } else if (!pattern.test(value)) {
+            branchInputError.textContent = "❌ รูปแบบไม่ถูกต้อง ต้องเป็น Bxxxx หรือ Mxxxx (เช่น B0001)";
+            branchInputError.style.display = 'block';
+            submitBranchBtn.disabled = true;
+        } else {
+            branchInputError.style.display = 'none';
+            submitBranchBtn.disabled = false;
+        }
+    });
+
+    branchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !submitBranchBtn.disabled) {
+            submitBranchBtn.click();
+        }
+    });
+
+    submitBranchBtn.onclick = () => {
+        const branchCode = branchInput.value.trim().toUpperCase();
+        branchCodeModal.style.display = 'none';
+        exportToExcel(branchCode);
+    };
+}
+
+// Scroll to Bottom Logic
+const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+if (scrollToBottomBtn) {
+    window.addEventListener('scroll', () => {
+        const threshold = 100; // Pixels from bottom
+        const totalHeight = document.documentElement.scrollHeight;
+        const viewportHeight = window.innerHeight;
+        const currentScroll = window.scrollY || window.pageYOffset;
+
+        // Show if page is scrollable and we are not near the bottom
+        if (totalHeight - viewportHeight - currentScroll > threshold) {
+            scrollToBottomBtn.classList.add('visible');
+        } else {
+            scrollToBottomBtn.classList.remove('visible');
+        }
+    });
+
+    scrollToBottomBtn.onclick = () => {
+        window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth'
+        });
+    };
+}

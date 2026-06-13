@@ -27,7 +27,7 @@
         <div class="logo-card">
             <div class="logo-container">
                 <div class="logo-placeholder">VISION VENTURES</div>
-                <div class="app-title">ฟอร์มแปลงไฟล์สำหรับ Audit สาขา</div>
+                <div class="app-title">ฟอร์มแปลงไฟล์สำหรับ Audit สาขา Version 2.0</div>
                 <p style="color: var(--text-muted); font-size: 0.9rem;">
                     อัปโหลดและจัดรูปแบบข้อมูลเพื่อรองรับการตรวจนับสต็อกภายในสาขา</p>
             </div>
@@ -73,9 +73,9 @@
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
-                <p style="font-weight: 600;">ลากไฟล์ .xls หรือ .xlsx มาวางที่นี่</p>
+                <p style="font-weight: 600;">ลากไฟล์สต็อกระบบมาวางที่นี่</p>
                 <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">
-                    หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์ของคุณ</p>
+                    หรือคลิกเพื่อเลือกไฟล์ (.xls, .xlsx)</p>
                 <input type="file" id="fileInput" accept=".xls,.xlsx" style="display: none;">
             </div>
         </section>
@@ -129,6 +129,14 @@
             <button id="downloadBtn" class="btn-primary">Download Audit XLSX</button>
         </section>
     </div>
+
+    <button id="scrollToBottomBtn" class="scroll-bottom-btn" title="เลื่อนไปล่างสุด">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+        <span>เลื่อนไปล่างสุด</span>
+    </button>
 
     <a href="https://docs.google.com/presentation/d/1aFN2XWkhm4UpB03h2quhXMDX8xl83FqM781FNrY7nwc/edit?usp=sharing"
         target="_blank" class="fap-btn">
@@ -286,6 +294,30 @@
             </div>
 
             <button id="closePopupBtn" class="btn-primary" style="margin-top: 1rem;">ปิด</button>
+        </div>
+    </div>
+
+    <!-- Branch Code Modal -->
+    <div id="branchCodeModal" class="modal-popup">
+        <div class="modal-popup-content" style="max-width: 420px;">
+            <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">กรอกรหัสสาขา</h2>
+            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบุรหัสสาขาเพื่อดาวน์โหลดรายงาน (เช่น B0001,
+                M3202)</p>
+
+            <div style="position: relative; margin-bottom: 1.5rem;">
+                <input type="text" id="branchInput" class="settings-input"
+                    style="text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em; border-radius: 12px; height: 50px; text-transform: uppercase;"
+                    placeholder="Bxxxx หรือ Mxxxx" maxlength="5" autocomplete="off">
+                <div id="branchInputError"
+                    style="color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600; display: none;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+                <button id="cancelBranchBtn" class="btn-secondary" style="flex: 1; padding: 0.8rem;">ยกเลิก</button>
+                <button id="submitBranchBtn" class="btn-primary"
+                    style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;" disabled>ดาวน์โหลด Excel</button>
+            </div>
         </div>
     </div>
 
