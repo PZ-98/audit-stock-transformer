@@ -1084,12 +1084,12 @@ if (branchCodeModal) {
             return;
         }
 
-        const pattern = /^[BMPQ]\d{4}$/;
+        const pattern = /^[BMPG]\d{4}$/;
         if (value.length === 0) {
             branchInputError.style.display = 'none';
             submitBranchBtn.disabled = true;
-        } else if (!/^[BMPQ]/i.test(value)) {
-            branchInputError.textContent = "❌ ต้องขึ้นต้นด้วยตัวอักษร B, M, P หรือ Q เท่านั้น";
+        } else if (!/^[BMPG]/i.test(value)) {
+            branchInputError.textContent = "❌ ต้องขึ้นต้นด้วยตัวอักษร B, M, P หรือ G เท่านั้น";
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else if (value.length < 5) {
@@ -1097,7 +1097,7 @@ if (branchCodeModal) {
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else if (!pattern.test(value)) {
-            branchInputError.textContent = "❌ รูปแบบไม่ถูกต้อง ต้องเป็น Bxxxx, Mxxxx, Pxxxx หรือ Qxxxx (เช่น B0001, P5001)";
+            branchInputError.textContent = "❌ รูปแบบไม่ถูกต้อง ต้องเป็น Bxxxx, Mxxxx, Pxxxx หรือ Gxxxx (เช่น B0001, P5001)";
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else {
