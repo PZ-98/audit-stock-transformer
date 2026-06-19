@@ -913,7 +913,7 @@ function createScanSheet(workbook) {
 
     for (let r = 2; r <= 5000; r++) {
         const row = scanSheet.getRow(r);
-        row.getCell(2).value = { formula: `IF(A${r}="","",_xlfn.XLOOKUP(A${r},'Frame'!D:D,'Frame'!E:E,"ไม่พบข้อมูล"))` };
+        row.getCell(2).value = { formula: `IF(A${r}="","",IFERROR(VLOOKUP(A${r},'Frame'!D:E,2,FALSE),"ไม่พบข้อมูล"))` };
     }
 }
 
