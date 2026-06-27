@@ -1057,6 +1057,10 @@ const branchInputError = document.getElementById('branchInputError');
 const cancelBranchBtn = document.getElementById('cancelBranchBtn');
 const submitBranchBtn = document.getElementById('submitBranchBtn');
 
+const pdfConfirmModal = document.getElementById('pdfConfirmModal');
+const cancelPdfBtn = document.getElementById('cancelPdfBtn');
+const confirmPdfBtn = document.getElementById('confirmPdfBtn');
+
 downloadBtn.onclick = () => {
     if (branchCodeModal && branchInput) {
         branchInput.value = '';
@@ -1084,12 +1088,12 @@ if (branchCodeModal) {
             return;
         }
 
-        const pattern = /^[BMPG]\d{4}$/;
+        const pattern = /^[BMPGQC]\d{4}$/;
         if (value.length === 0) {
             branchInputError.style.display = 'none';
             submitBranchBtn.disabled = true;
-        } else if (!/^[BMPG]/i.test(value)) {
-            branchInputError.textContent = "❌ ต้องขึ้นต้นด้วยตัวอักษร B, M, P หรือ G เท่านั้น";
+        } else if (!/^[BMPGQC]/i.test(value)) {
+            branchInputError.textContent = "❌ ต้องขึ้นต้นด้วยตัวอักษร B, M, P, G, Q หรือ C เท่านั้น";
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else if (value.length < 5) {
@@ -1097,7 +1101,7 @@ if (branchCodeModal) {
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else if (!pattern.test(value)) {
-            branchInputError.textContent = "❌ รูปแบบไม่ถูกต้อง ต้องเป็น Bxxxx, Mxxxx, Pxxxx หรือ Gxxxx (เช่น B0001, P5001)";
+            branchInputError.textContent = "❌ รูปแบบไม่ถูกต้อง ต้องเป็น Bxxxx, Mxxxx, Pxxxx, Gxxxx, Qxxxx หรือ Cxxxx (เช่น B0001, P5001, Q0001, C0001)";
             branchInputError.style.display = 'block';
             submitBranchBtn.disabled = true;
         } else {
@@ -1112,11 +1116,158 @@ if (branchCodeModal) {
         }
     });
 
-    submitBranchBtn.onclick = () => {
+    submitBranchBtn.onclick = async () => {
         const branchCode = branchInput.value.trim().toUpperCase();
         branchCodeModal.style.display = 'none';
-        exportToExcel(branchCode);
+        await exportToExcel(branchCode);
+        
+        if (pdfConfirmModal) {
+            pdfConfirmModal.style.display = 'flex';
+            pdfConfirmModal.dataset.branchCode = branchCode;
+        }
     };
+}
+
+if (pdfConfirmModal) {
+    cancelPdfBtn.onclick = () => {
+        pdfConfirmModal.style.display = 'none';
+    };
+
+    confirmPdfBtn.onclick = () => {
+        const branchCode = pdfConfirmModal.dataset.branchCode || '';
+        pdfConfirmModal.style.display = 'none';
+        exportToPdf(branchCode);
+    };
+}
+
+// --- PDF EXPORT FUNCTIONALITY ---
+
+function formatThaiDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear() + 543;
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+function generatePrintHeader(branchCode) {
+    const printDate = formatThaiDate(new Date());
+    return `
+        <div class="print-header">
+            <div class="print-logo">VISION VENTURES</div>
+            <div class="print-title">รายงานผลการตรวจนับสต็อกสินค้า (Audit Stock Report)</div>
+            <div class="print-meta">
+                <div><strong>สาขา (Branch):</strong> ${branchCode}</div>
+                <div><strong>วันที่พิมพ์ (Date):</strong> ${printDate}</div>
+            </div>
+        </div>
+    `;
+}
+
+function generatePrintBlankRows() {
+    let blankHtml = '';
+    for (let index = 0; index < 1; index++) {
+        blankHtml += `
+            <tr style="height: 20px;">
+                <td>-</td>
+                <td></td>
+                <td style="text-align: right;">0</td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        `;
+    }
+    return blankHtml;
+}
+
+function generatePrintDeptRows(deptName, items) {
+    const sysSum = items.reduce((sum, item) => sum + item.balance, 0);
+    const actSum = items.reduce((sum, item) => sum + (item.actualCount || 0), 0);
+    const hasAct = items.some(item => item.actualCount !== undefined && item.actualCount !== null);
+    const actText = hasAct ? actSum.toLocaleString() : '';
+    const varText = hasAct ? (actSum - sysSum).toLocaleString() : '';
+
+    let rowsHtml = `
+        <tr class="print-dept-header">
+            <td colspan="2">Dept Name: ${deptName}</td>
+            <td style="text-align: right;">${sysSum.toLocaleString()}</td>
+            <td style="text-align: right;">${actText}</td>
+            <td style="text-align: right;">${varText}</td>
+            <td></td>
+        </tr>
+    `;
+
+    items.forEach(item => {
+        const itemAct = item.actualCount !== undefined && item.actualCount !== null;
+        const itemActText = itemAct ? item.actualCount.toLocaleString() : '';
+        const itemVarText = itemAct ? (item.actualCount - item.balance).toLocaleString() : '';
+        rowsHtml += `
+            <tr>
+                <td>${item.code}</td>
+                <td>${item.description}</td>
+                <td style="text-align: right;">${item.balance.toLocaleString()}</td>
+                <td style="text-align: right;">${itemActText}</td>
+                <td style="text-align: right;">${itemVarText}</td>
+                <td></td>
+            </tr>
+        `;
+    });
+
+    return rowsHtml + generatePrintBlankRows();
+}
+
+function generatePrintCategorySection(category) {
+    let sectionHtml = `
+        <div class="print-category-section">
+            <h3 class="print-category-title">หมวดหมู่สินค้า: ${category}</h3>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">รหัสสินค้า (Code)</th>
+                        <th style="width: 45%;">รายละเอียดสินค้า (Description)</th>
+                        <th style="width: 10%; text-align: right;">ยอดระบบ (System)</th>
+                        <th style="width: 10%; text-align: right;">นับได้ (Actual)</th>
+                        <th style="width: 10%; text-align: right;">ส่วนต่าง (Variance)</th>
+                        <th style="width: 10%;">หมายเหตุ (Remark)</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    Object.keys(groupedData).forEach(dept => {
+        const items = groupedData[dept].filter(item => item.category === category);
+        if (items.length === 0) return;
+        sectionHtml += generatePrintDeptRows(dept, items);
+    });
+
+    sectionHtml += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    return sectionHtml;
+}
+
+function generatePrintHtml(branchCode) {
+    let html = '<div class="print-page-footer"></div>';
+    html += generatePrintHeader(branchCode);
+    const activeCategories = Array.from(selectedCategories).filter(cat => {
+        return Object.values(groupedData).some(items => items.some(item => item.category === cat));
+    });
+    activeCategories.forEach(cat => {
+        html += generatePrintCategorySection(cat);
+    });
+    return html;
+}
+
+function exportToPdf(branchCode) {
+    const printArea = document.getElementById('printArea');
+    if (!printArea) return;
+    printArea.innerHTML = generatePrintHtml(branchCode);
+    window.print();
+    printArea.innerHTML = '';
 }
 
 // Scroll to Bottom Logic

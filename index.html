@@ -302,12 +302,12 @@
         <div class="modal-popup-content" style="max-width: 420px;">
             <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">กรอกรหัสสาขา</h2>
             <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบุรหัสสาขาเพื่อดาวน์โหลดรายงาน (เช่น B0001,
-                M3202, P5001, G6001)</p>
+                M3202, P5001, G6001, Q0001, C0001)</p>
 
             <div style="position: relative; margin-bottom: 1.5rem;">
                 <input type="text" id="branchInput" class="settings-input"
                     style="text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em; border-radius: 12px; height: 50px; text-transform: uppercase;"
-                    placeholder="Bxxxx, Mxxxx, Pxxxx หรือ Gxxxx" maxlength="5" autocomplete="off">
+                    placeholder="Bxxxx, Mxxxx, Pxxxx, Gxxxx, Qxxxx หรือ Cxxxx" maxlength="5" autocomplete="off">
                 <div id="branchInputError"
                     style="color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; font-weight: 600; display: none;">
                 </div>
@@ -320,6 +320,21 @@
             </div>
         </div>
     </div>
+
+    <!-- PDF Confirm Modal -->
+    <div id="pdfConfirmModal" class="modal-popup">
+        <div class="modal-popup-content" style="max-width: 420px; text-align: center;">
+            <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">ดาวน์โหลดรายงาน PDF</h2>
+            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">คุณต้องการดาวน์โหลดรายงานฉบับ PDF เพื่อใช้พิมพ์ใส่กระดาษ A4 ด้วยหรือไม่?</p>
+            <div style="display: flex; gap: 0.75rem;">
+                <button id="cancelPdfBtn" class="btn-secondary" style="flex: 1; padding: 0.8rem;">ไม่ต้องการ</button>
+                <button id="confirmPdfBtn" class="btn-primary" style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;">ต้องการ PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Print Area for PDF Generation -->
+    <div id="printArea" class="print-only"></div>
 
     <script src="app.js"></script>
 </body>
