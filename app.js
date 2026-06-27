@@ -1251,7 +1251,7 @@ function generatePrintCategorySection(category) {
 }
 
 function generatePrintHtml(branchCode) {
-    let html = '<div class="print-page-footer"></div>';
+    let html = '';
     html += generatePrintHeader(branchCode);
     const activeCategories = Array.from(selectedCategories).filter(cat => {
         return Object.values(groupedData).some(items => items.some(item => item.category === cat));

@@ -1130,7 +1130,7 @@ tr.dept-row td {
 }
 
 /* Hide print-only element in screen view */
-.print-only, .print-page-footer {
+.print-only {
   display: none;
 }
 
@@ -1151,23 +1151,6 @@ tr.dept-row td {
   @page {
     size: A4 portrait;
     margin: 10mm 10mm 15mm 10mm;
-  }
-
-  /* Repeated page footer for page numbers */
-  .print-page-footer {
-    display: block !important;
-    position: fixed;
-    bottom: -10mm;
-    right: 0;
-    font-size: 7.5pt;
-    color: #475569;
-    font-weight: bold;
-    text-align: right;
-    width: 100%;
-  }
-  
-  .print-page-footer::after {
-    content: "หน้า " counter(page);
   }
   
   body {
