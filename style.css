@@ -1129,6 +1129,41 @@ tr.dept-row td {
   transform: scale(1.1);
 }
 
+/* PDF Group Checklist Styles */
+.pdf-group-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.pdf-group-item:hover {
+  border-color: var(--primary-light);
+  background: rgba(79, 70, 229, 0.02);
+}
+
+.pdf-group-item input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.pdf-group-item label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+  flex: 1;
+  text-align: left;
+}
+
 /* Hide print-only element in screen view */
 .print-only {
   display: none;

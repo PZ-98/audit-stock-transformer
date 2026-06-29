@@ -1122,10 +1122,50 @@ if (branchCodeModal) {
         await exportToExcel(branchCode);
         
         if (pdfConfirmModal) {
+            renderPdfGroupOptions();
             pdfConfirmModal.style.display = 'flex';
             pdfConfirmModal.dataset.branchCode = branchCode;
         }
     };
+}
+
+function getActiveExcelCategories() {
+    return Array.from(selectedCategories).filter(category => {
+        return Object.values(groupedData).some(items => 
+            items.some(item => item.category === category)
+        );
+    });
+}
+
+function renderPdfGroupOptions() {
+    const pdfGroupList = document.getElementById('pdfGroupList');
+    if (!pdfGroupList) return;
+    
+    pdfGroupList.innerHTML = '';
+    const activeCategories = getActiveExcelCategories();
+    
+    activeCategories.forEach(category => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'pdf-group-item';
+        itemDiv.innerHTML = `
+            <input type="checkbox" id="pdf-chk-${category}" data-category="${category}" checked>
+            <label for="pdf-chk-${category}">${category}</label>
+        `;
+        pdfGroupList.appendChild(itemDiv);
+    });
+}
+
+function getSelectedPdfCategories() {
+    const selectedPdfCategories = [];
+    const checkboxes = document.querySelectorAll('#pdfGroupList input[type="checkbox"]');
+    
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            selectedPdfCategories.push(checkbox.dataset.category);
+        }
+    });
+    
+    return selectedPdfCategories;
 }
 
 if (pdfConfirmModal) {
@@ -1135,8 +1175,15 @@ if (pdfConfirmModal) {
 
     confirmPdfBtn.onclick = () => {
         const branchCode = pdfConfirmModal.dataset.branchCode || '';
+        const selectedPdfCategories = getSelectedPdfCategories();
+        
+        if (selectedPdfCategories.length === 0) {
+            alert('กรุณาเลือกอย่างน้อย 1 หมวดหมู่เพื่อพิมพ์ PDF');
+            return;
+        }
+        
         pdfConfirmModal.style.display = 'none';
-        exportToPdf(branchCode);
+        exportToPdf(branchCode, selectedPdfCategories);
     };
 }
 
@@ -1250,22 +1297,28 @@ function generatePrintCategorySection(category) {
     return sectionHtml;
 }
 
-function generatePrintHtml(branchCode) {
+function generatePrintHtml(branchCode, selectedPdfCategories = []) {
     let html = '';
     html += generatePrintHeader(branchCode);
-    const activeCategories = Array.from(selectedCategories).filter(cat => {
+    
+    const categoriesToPrint = selectedPdfCategories.length > 0 
+        ? selectedPdfCategories 
+        : getActiveExcelCategories();
+
+    const activeCategories = categoriesToPrint.filter(cat => {
         return Object.values(groupedData).some(items => items.some(item => item.category === cat));
     });
+    
     activeCategories.forEach(cat => {
         html += generatePrintCategorySection(cat);
     });
     return html;
 }
 
-function exportToPdf(branchCode) {
+function exportToPdf(branchCode, selectedPdfCategories = []) {
     const printArea = document.getElementById('printArea');
     if (!printArea) return;
-    printArea.innerHTML = generatePrintHtml(branchCode);
+    printArea.innerHTML = generatePrintHtml(branchCode, selectedPdfCategories);
     window.print();
     printArea.innerHTML = '';
 }

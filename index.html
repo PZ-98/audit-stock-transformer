@@ -325,7 +325,16 @@
     <div id="pdfConfirmModal" class="modal-popup">
         <div class="modal-popup-content" style="max-width: 420px; text-align: center;">
             <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">ดาวน์โหลดรายงาน PDF</h2>
-            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">คุณต้องการดาวน์โหลดรายงานฉบับ PDF เพื่อใช้พิมพ์ใส่กระดาษ A4 ด้วยหรือไม่?</p>
+            <p class="popup-subtitle" style="margin-bottom: 1.25rem;">คุณต้องการดาวน์โหลดรายงานฉบับ PDF เพื่อใช้พิมพ์ใส่กระดาษ A4 ด้วยหรือไม่?</p>
+            
+            <!-- Group selection for PDF -->
+            <div id="pdfGroupSelection" style="text-align: left; margin-bottom: 1.5rem; background: rgba(248, 250, 252, 0.8); border: 1px solid rgba(79, 70, 229, 0.08); border-radius: 14px; padding: 1.25rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary-dark);">เลือกหมวดหมู่สินค้าที่จะพิมพ์ PDF:</p>
+                <div id="pdfGroupList" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                    <!-- Dynamically populated via JS -->
+                </div>
+            </div>
+
             <div style="display: flex; gap: 0.75rem;">
                 <button id="cancelPdfBtn" class="btn-secondary" style="flex: 1; padding: 0.8rem;">ไม่ต้องการ</button>
                 <button id="confirmPdfBtn" class="btn-primary" style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;">ต้องการ PDF</button>
