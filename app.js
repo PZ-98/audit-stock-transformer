@@ -880,6 +880,34 @@ function renderItemRow(item) {
     previewTableBody.appendChild(tr);
 }
 
+async function saveFileWithPickerOrFallback(blob, filename) {
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: 'Excel Workbook',
+                    accept: {
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+                    }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return true;
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                return false;
+            }
+            saveAs(blob, filename);
+            return true;
+        }
+    }
+    saveAs(blob, filename);
+    return true;
+}
+
 async function exportToExcel(branchCode) {
     const workbook = new ExcelJS.Workbook();
     createInstructionSheet(workbook);
@@ -893,9 +921,28 @@ async function exportToExcel(branchCode) {
         createCategorySheet(workbook, cat, branchCode);
     });
 
+    createInfoSheet(workbook, branchCode);
+
     const filename = getExportFilename(branchCode);
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), filename);
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    return await saveFileWithPickerOrFallback(blob, filename);
+}
+
+function createInfoSheet(workbook, branchCode) {
+    const infoSheet = workbook.addWorksheet('Info', { state: 'hidden' });
+    infoSheet.state = 'hidden';
+    infoSheet.columns = [
+        { header: 'Property', key: 'property', width: 25 },
+        { header: 'Value', key: 'value', width: 35 }
+    ];
+
+    const headerRow = infoSheet.getRow(1);
+    headerRow.font = { bold: true };
+
+    const downloadDate = formatThaiDate(new Date());
+    infoSheet.addRow({ property: 'Branch Code', value: branchCode || '' });
+    infoSheet.addRow({ property: 'Download Date', value: downloadDate });
 }
 
 function createScanSheet(workbook) {
@@ -1057,6 +1104,9 @@ const branchInputError = document.getElementById('branchInputError');
 const cancelBranchBtn = document.getElementById('cancelBranchBtn');
 const submitBranchBtn = document.getElementById('submitBranchBtn');
 
+const downloadCompleteModal = document.getElementById('downloadCompleteModal');
+const downloadCompleteOkBtn = document.getElementById('downloadCompleteOkBtn');
+
 const pdfConfirmModal = document.getElementById('pdfConfirmModal');
 const cancelPdfBtn = document.getElementById('cancelPdfBtn');
 const confirmPdfBtn = document.getElementById('confirmPdfBtn');
@@ -1119,7 +1169,24 @@ if (branchCodeModal) {
     submitBranchBtn.onclick = async () => {
         const branchCode = branchInput.value.trim().toUpperCase();
         branchCodeModal.style.display = 'none';
-        await exportToExcel(branchCode);
+        const isSaved = await exportToExcel(branchCode);
+        if (!isSaved) return;
+        
+        if (downloadCompleteModal) {
+            downloadCompleteModal.style.display = 'flex';
+            downloadCompleteModal.dataset.branchCode = branchCode;
+        } else if (pdfConfirmModal) {
+            renderPdfGroupOptions();
+            pdfConfirmModal.style.display = 'flex';
+            pdfConfirmModal.dataset.branchCode = branchCode;
+        }
+    };
+}
+
+if (downloadCompleteModal && downloadCompleteOkBtn) {
+    downloadCompleteOkBtn.onclick = () => {
+        const branchCode = downloadCompleteModal.dataset.branchCode || '';
+        downloadCompleteModal.style.display = 'none';
         
         if (pdfConfirmModal) {
             renderPdfGroupOptions();

@@ -301,8 +301,19 @@
     <div id="branchCodeModal" class="modal-popup">
         <div class="modal-popup-content" style="max-width: 420px;">
             <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">กรอกรหัสสาขา</h2>
-            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบุรหัสสาขาเพื่อดาวน์โหลดรายงาน (เช่น B0001,
+            <p class="popup-subtitle" style="margin-bottom: 1rem;">ระบุรหัสสาขาเพื่อดาวน์โหลดรายงาน (เช่น B0001,
                 M3202, P5001, G6001, Q0001, C0001)</p>
+
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; text-align: left; font-size: 0.85rem; color: #dc2626; line-height: 1.4;">
+                <div style="font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem; color: #b91c1c;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    ข้อควรระวัง
+                </div>
+                <div>โปรดระบุรหัสสาขาให้ถูกต้อง หากระบุผิดจะไม่สามารถส่งผลการตรวจสอบได้</div>
+                <div style="margin-top: 0.25rem; font-size: 0.8rem; color: #ef4444;">
+                    สงสัยเพิ่มเติมติดต่อ <a href="https://line.me/ti/p/ph7H35svrL" target="_blank" rel="noopener noreferrer" style="color: #b91c1c; font-weight: 700; text-decoration: underline;">Audit Fluke</a>
+                </div>
+            </div>
 
             <div style="position: relative; margin-bottom: 1.5rem;">
                 <input type="text" id="branchInput" class="settings-input"
@@ -318,6 +329,23 @@
                 <button id="submitBranchBtn" class="btn-primary"
                     style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;" disabled>ดาวน์โหลด Excel</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Download Complete Modal -->
+    <div id="downloadCompleteModal" class="modal-popup">
+        <div class="modal-popup-content" style="max-width: 420px; text-align: center;">
+            <div class="success-icon-wrapper" style="margin-bottom: 1.25rem;">
+                <div class="success-icon-pulse"></div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="success-icon" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">Download เสร็จสิ้น</h2>
+            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบบทำการบันทึกไฟล์ Audit Stock XLSX เรียบร้อยแล้ว</p>
+            <button id="downloadCompleteOkBtn" class="btn-primary"
+                style="width: 100%; padding: 0.8rem; margin: 0; box-shadow: none;">ตกลง</button>
         </div>
     </div>
 
