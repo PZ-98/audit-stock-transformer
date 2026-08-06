@@ -1440,7 +1440,7 @@ if (scrollToBottomBtn) {
 function isOutsideAuditPeriod() {
     const today = new Date();
     const currentDay = today.getDate();
-    return currentDay < 15 || currentDay > 22;
+    return currentDay < 14;
 }
 
 function initDateNoticeModal() {
