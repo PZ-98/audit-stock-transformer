@@ -1435,3 +1435,26 @@ if (scrollToBottomBtn) {
         });
     };
 }
+
+// --- Out of Audit Period Notice Modal ---
+function isOutsideAuditPeriod() {
+    const today = new Date();
+    const currentDay = today.getDate();
+    return currentDay < 15 || currentDay > 22;
+}
+
+function initDateNoticeModal() {
+    const modal = document.getElementById('dateNoticeModal');
+    const okBtn = document.getElementById('dateNoticeOkBtn');
+    if (!modal || !okBtn) return;
+
+    okBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    if (isOutsideAuditPeriod()) {
+        modal.style.display = 'flex';
+    }
+}
+
+initDateNoticeModal();

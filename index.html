@@ -304,14 +304,23 @@
             <p class="popup-subtitle" style="margin-bottom: 1rem;">ระบุรหัสสาขาเพื่อดาวน์โหลดรายงาน (เช่น B0001,
                 M3202, P5001, G6001, Q0001, C0001)</p>
 
-            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; text-align: left; font-size: 0.85rem; color: #dc2626; line-height: 1.4;">
-                <div style="font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem; color: #b91c1c;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <div
+                style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; text-align: left; font-size: 0.85rem; color: #dc2626; line-height: 1.4;">
+                <div
+                    style="font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.4rem; color: #b91c1c;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                     ข้อควรระวัง
                 </div>
                 <div>โปรดระบุรหัสสาขาให้ถูกต้อง หากระบุผิดจะไม่สามารถส่งผลการตรวจสอบได้</div>
                 <div style="margin-top: 0.25rem; font-size: 0.8rem; color: #ef4444;">
-                    สงสัยเพิ่มเติมติดต่อ <a href="https://line.me/ti/p/ph7H35svrL" target="_blank" rel="noopener noreferrer" style="color: #b91c1c; font-weight: 700; text-decoration: underline;">Audit Fluke</a>
+                    สงสัยเพิ่มเติมติดต่อ <a href="https://line.me/ti/p/ph7H35svrL" target="_blank"
+                        rel="noopener noreferrer"
+                        style="color: #b91c1c; font-weight: 700; text-decoration: underline;">Audit Fluke</a>
                 </div>
             </div>
 
@@ -343,7 +352,8 @@
                 </svg>
             </div>
             <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">Download เสร็จสิ้น</h2>
-            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบบทำการบันทึกไฟล์ Audit Stock XLSX เรียบร้อยแล้ว</p>
+            <p class="popup-subtitle" style="margin-bottom: 1.5rem;">ระบบทำการบันทึกไฟล์ Audit Stock XLSX เรียบร้อยแล้ว
+            </p>
             <button id="downloadCompleteOkBtn" class="btn-primary"
                 style="width: 100%; padding: 0.8rem; margin: 0; box-shadow: none;">ตกลง</button>
         </div>
@@ -353,11 +363,14 @@
     <div id="pdfConfirmModal" class="modal-popup">
         <div class="modal-popup-content" style="max-width: 420px; text-align: center;">
             <h2 class="popup-title" style="margin-bottom: 0.5rem; color: var(--primary-dark);">ดาวน์โหลดรายงาน PDF</h2>
-            <p class="popup-subtitle" style="margin-bottom: 1.25rem;">คุณต้องการดาวน์โหลดรายงานฉบับ PDF เพื่อใช้พิมพ์ใส่กระดาษ A4 ด้วยหรือไม่?</p>
-            
+            <p class="popup-subtitle" style="margin-bottom: 1.25rem;">คุณต้องการดาวน์โหลดรายงานฉบับ PDF
+                เพื่อใช้พิมพ์ใส่กระดาษ A4 ด้วยหรือไม่?</p>
+
             <!-- Group selection for PDF -->
-            <div id="pdfGroupSelection" style="text-align: left; margin-bottom: 1.5rem; background: rgba(248, 250, 252, 0.8); border: 1px solid rgba(79, 70, 229, 0.08); border-radius: 14px; padding: 1.25rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                <p style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary-dark);">เลือกหมวดหมู่สินค้าที่จะพิมพ์ PDF:</p>
+            <div id="pdfGroupSelection"
+                style="text-align: left; margin-bottom: 1.5rem; background: rgba(248, 250, 252, 0.8); border: 1px solid rgba(79, 70, 229, 0.08); border-radius: 14px; padding: 1.25rem; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <p style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary-dark);">
+                    เลือกหมวดหมู่สินค้าที่จะพิมพ์ PDF:</p>
                 <div id="pdfGroupList" style="display: flex; flex-direction: column; gap: 0.65rem;">
                     <!-- Dynamically populated via JS -->
                 </div>
@@ -365,8 +378,31 @@
 
             <div style="display: flex; gap: 0.75rem;">
                 <button id="cancelPdfBtn" class="btn-secondary" style="flex: 1; padding: 0.8rem;">ไม่ต้องการ</button>
-                <button id="confirmPdfBtn" class="btn-primary" style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;">ต้องการ PDF</button>
+                <button id="confirmPdfBtn" class="btn-primary"
+                    style="flex: 1; padding: 0.8rem; margin: 0; box-shadow: none;">ต้องการ PDF</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Out of Audit Period Notice Modal -->
+    <div id="dateNoticeModal" class="modal-popup">
+        <div class="modal-popup-content" style="max-width: 440px; text-align: center;">
+            <div class="warning-icon-wrapper">
+                <div class="warning-icon-pulse"></div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="warning-icon" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+            <h2 class="popup-title" style="margin-bottom: 0.5rem; color: #b45309;">แจ้งเตือนช่วงเวลาการตรวจนับ</h2>
+            <p class="popup-subtitle" style="margin-bottom: 1.5rem; color: #475569; line-height: 1.6;">
+                ขณะนี้อยู่นอกช่วงเวลาการตรวจนับสต็อกประจำเดือน (วันที่ 15 ถึง 22 ของทุกเดือน) <br>
+                ท่านยังคงสามารถใช้งานระบบเพื่อแปลงไฟล์ได้ตามปกติ แต่จะไม่สามารถอัปโหลดไฟล์ผลการตรวจนับเข้าสู่ระบบได้
+            </p>
+            <button id="dateNoticeOkBtn" class="btn-primary"
+                style="width: 100%; padding: 0.8rem; margin: 0; box-shadow: none; background: linear-gradient(135deg, #f59e0b, #d97706);">รับทราบ</button>
         </div>
     </div>
 
