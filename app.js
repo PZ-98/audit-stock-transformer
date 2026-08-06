@@ -908,20 +908,32 @@ async function saveFileWithPickerOrFallback(blob, filename) {
     return true;
 }
 
+async function applySheetProtection(worksheet) {
+    await worksheet.protect('', {
+        selectLockedCells: true,
+        selectUnlockedCells: true,
+        formatCells: true,
+        formatColumns: true,
+        formatRows: true,
+        sort: true,
+        autoFilter: true
+    });
+}
+
 async function exportToExcel(branchCode) {
     const workbook = new ExcelJS.Workbook();
-    createInstructionSheet(workbook);
-    createScanSheet(workbook);
+    await createInstructionSheet(workbook);
+    await createScanSheet(workbook);
 
     const activeCategories = Array.from(selectedCategories).filter(cat => {
         return Object.values(groupedData).some(items => items.some(item => item.category === cat));
     });
 
-    activeCategories.forEach(cat => {
-        createCategorySheet(workbook, cat, branchCode);
-    });
+    for (const cat of activeCategories) {
+        await createCategorySheet(workbook, cat, branchCode);
+    }
 
-    createInfoSheet(workbook, branchCode);
+    await createInfoSheet(workbook, branchCode);
 
     const filename = getExportFilename(branchCode);
     const buffer = await workbook.xlsx.writeBuffer();
@@ -929,7 +941,7 @@ async function exportToExcel(branchCode) {
     return await saveFileWithPickerOrFallback(blob, filename);
 }
 
-function createInfoSheet(workbook, branchCode) {
+async function createInfoSheet(workbook, branchCode) {
     const infoSheet = workbook.addWorksheet('Info', { state: 'hidden' });
     infoSheet.state = 'hidden';
     infoSheet.columns = [
@@ -943,9 +955,10 @@ function createInfoSheet(workbook, branchCode) {
     const downloadDate = formatThaiDate(new Date());
     infoSheet.addRow({ property: 'Branch Code', value: branchCode || '' });
     infoSheet.addRow({ property: 'Download Date', value: downloadDate });
+    await applySheetProtection(infoSheet);
 }
 
-function createScanSheet(workbook) {
+async function createScanSheet(workbook) {
     const scanSheet = workbook.addWorksheet('สแกน', { properties: { tabColor: { argb: '#5c5c5c' } } });
     scanSheet.columns = [
         { header: 'รายการสแกน (Barcode)', key: 'barcode', width: 25 },
@@ -960,11 +973,13 @@ function createScanSheet(workbook) {
 
     for (let r = 2; r <= 5000; r++) {
         const row = scanSheet.getRow(r);
+        row.getCell(1).protection = { locked: false };
         row.getCell(2).value = { formula: `IF(A${r}="","",IFERROR(VLOOKUP(A${r},'Frame'!D:E,2,FALSE),"ไม่พบข้อมูล"))` };
     }
+    await applySheetProtection(scanSheet);
 }
 
-function createInstructionSheet(workbook) {
+async function createInstructionSheet(workbook) {
     const insSheet = workbook.addWorksheet('คู่มือการใช้งาน', { properties: { tabColor: { argb: 'FFFF0000' } } });
     insSheet.columns = [{ width: 5 }, { width: 80 }];
     const insTitle = insSheet.addRow(["", "คู่มือการใช้งานไฟล์ Audit Stock"]);
@@ -988,6 +1003,7 @@ function createInstructionSheet(workbook) {
         }
         insSheet.addRow([]);
     });
+    await applySheetProtection(insSheet);
 }
 
 function getCategoryTabColor(cat) {
@@ -1003,7 +1019,7 @@ function getCategoryTabColor(cat) {
     return tabColors[cat] || 'FF4F46E5';
 }
 
-function createCategorySheet(workbook, cat, branchCode) {
+async function createCategorySheet(workbook, cat, branchCode) {
     const tabColor = getCategoryTabColor(cat);
     const worksheet = workbook.addWorksheet(cat, {
         views: [{ state: 'frozen', ySplit: 2 }],
@@ -1019,6 +1035,7 @@ function createCategorySheet(workbook, cat, branchCode) {
     worksheet.columns = [
         { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
     ];
+    await applySheetProtection(worksheet);
 }
 
 function setupSheetHeaders(worksheet, cat, branchCode, tabColor) {
@@ -1061,6 +1078,9 @@ function populateSheetData(worksheet, cat) {
                 row.getCell(7).value = item.actualCount !== undefined && item.actualCount !== null ? item.actualCount : null;
             }
             row.getCell(8).value = { formula: `G${row.number}-F${row.number}` };
+            row.eachCell({ includeEmpty: true }, cell => {
+                cell.protection = { locked: false };
+            });
         });
 
         addBlankRowsForDept(worksheet);
@@ -1078,6 +1098,7 @@ function addBlankRowsForDept(worksheet) {
         blankRow.getCell(8).value = { formula: `G${blankRow.number}-F${blankRow.number}` };
 
         blankRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.protection = { locked: false };
             cell.border = {
                 top: { style: 'thin' }, left: { style: 'thin' },
                 bottom: { style: 'thin' }, right: { style: 'thin' }
