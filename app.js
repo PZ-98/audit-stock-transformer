@@ -1035,7 +1035,7 @@ async function createCategorySheet(workbook, cat, branchCode) {
     worksheet.columns = [
         { width: 15 }, { width: 10 }, { width: 10 }, { width: 25 }, { width: 45 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 25 }
     ];
-    await applySheetProtection(worksheet);
+    worksheet.autoFilter = `A2:I${worksheet.rowCount}`;
 }
 
 function setupSheetHeaders(worksheet, cat, branchCode, tabColor) {
@@ -1045,13 +1045,21 @@ function setupSheetHeaders(worksheet, cat, branchCode, tabColor) {
     titleRow.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
     titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
+    titleRow.getCell(1).dataValidation = {
+        type: 'custom',
+        allowBlank: false,
+        formulae: ['=FALSE'],
+        showErrorMessage: true,
+        errorStyle: 'error',
+        errorTitle: 'ไม่อนุญาตให้แก้ไข',
+        error: 'หัวข้อรายงานนี้ถูกล็อก ห้ามแก้ไขข้อมูล'
+    };
 
     const headerRow = worksheet.addRow(["Category", "Type", "Dept", "Code", "Description", "System Stock", "Actual Count", "Variance", "Remark"]);
     headerRow.font = { bold: true };
     headerRow.eachCell(cell => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
         cell.border = { bottom: { style: 'thin' } };
-        cell.protection = { locked: false };
     });
 }
 
