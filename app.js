@@ -1051,6 +1051,7 @@ function setupSheetHeaders(worksheet, cat, branchCode, tabColor) {
     headerRow.eachCell(cell => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
         cell.border = { bottom: { style: 'thin' } };
+        cell.protection = { locked: false };
     });
 }
 
@@ -1063,6 +1064,7 @@ function populateSheetData(worksheet, cat) {
         deptRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         deptRow.eachCell(cell => {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF404040' } };
+            cell.protection = { locked: false };
         });
 
         const startRow = worksheet.rowCount + 1;
