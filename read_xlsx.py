@@ -1,55 +1,72 @@
+"""Debug helper: print the first rows of an .xlsx file without third-party libraries.
+
+Usage:
+    uv run read_xlsx.py "Scan Ex.xlsx"
+    uv run read_xlsx.py "Scan Ex.xlsx" --sheet 2 --rows 50
+"""
+import argparse
+import os
 import zipfile
 import xml.etree.ElementTree as ET
-import os
 
-def parse_xlsx(file_path):
+NS = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+
+
+def load_shared_strings(zip_ref):
+    try:
+        with zip_ref.open('xl/sharedStrings.xml') as f:
+            root = ET.parse(f).getroot()
+    except KeyError:
+        return []
+
+    # One <si> per string; rich text splits a single string across several <t> elements
+    return [''.join(t.text or '' for t in si.iter(f"{{{NS['ns']}}}t"))
+            for si in root.findall('ns:si', NS)]
+
+
+def read_cell_value(c_elem, shared_strings):
+    cell_type = c_elem.get('t')
+    if cell_type == 'inlineStr':
+        return ''.join(t.text or '' for t in c_elem.iter(f"{{{NS['ns']}}}t"))
+
+    v_elem = c_elem.find('ns:v', NS)
+    if v_elem is None:
+        return None
+    if cell_type == 's':
+        return shared_strings[int(v_elem.text)]
+    return v_elem.text
+
+
+def parse_xlsx(file_path, sheet_number=1, max_rows=20):
     print(f"Reading file: {file_path}")
     if not os.path.exists(file_path):
         print("File does not exist")
         return
 
     with zipfile.ZipFile(file_path, 'r') as zip_ref:
-        # Load shared strings
-        shared_strings = []
+        shared_strings = load_shared_strings(zip_ref)
+        sheet_path = f'xl/worksheets/sheet{sheet_number}.xml'
+
         try:
-            with zip_ref.open('xl/sharedStrings.xml') as f:
-                tree = ET.parse(f)
-                root = tree.getroot()
-                # Namespaces
-                ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                for t in root.findall('.//ns:t', ns):
-                    shared_strings.append(t.text)
+            with zip_ref.open(sheet_path) as f:
+                root = ET.parse(f).getroot()
         except KeyError:
-            print("No shared strings found")
+            print(f"Sheet not found: {sheet_path}")
+            return
 
-        # Load sheet1
-        try:
-            with zip_ref.open('xl/worksheets/sheet1.xml') as f:
-                tree = ET.parse(f)
-                root = tree.getroot()
-                ns = {'ns': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                
-                rows = []
-                for row_elem in root.findall('.//ns:row', ns):
-                    row_data = {}
-                    for c_elem in row_elem.findall('ns:c', ns):
-                        r = c_elem.get('r') # e.g. A1
-                        # Parse col index from r
-                        col_str = ''.join([char for char in r if char.isalpha()])
-                        t = c_elem.get('t')
-                        v_elem = c_elem.find('ns:v', ns)
-                        val = None
-                        if v_elem is not None:
-                            val = v_elem.text
-                            if t == 's':
-                                val = shared_strings[int(val)]
-                        row_data[col_str] = val
-                    rows.append(row_data)
-                
-                # Print first 20 rows
-                for idx, row in enumerate(rows[:20]):
-                    print(f"Row {idx+1}: {row}")
-        except Exception as e:
-            print(f"Error reading sheet1: {e}")
+        rows = root.findall('.//ns:row', NS)
+        for row_elem in rows[:max_rows]:
+            row_data = {}
+            for c_elem in row_elem.findall('ns:c', NS):
+                col = ''.join(ch for ch in c_elem.get('r', '') if ch.isalpha())
+                row_data[col] = read_cell_value(c_elem, shared_strings)
+            print(f"Row {row_elem.get('r')}: {row_data}")
 
-parse_xlsx("Scan Ex.xlsx")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Print the first rows of an .xlsx sheet.')
+    parser.add_argument('file', help='path to the .xlsx file')
+    parser.add_argument('--sheet', type=int, default=1, help='sheet number (default: 1)')
+    parser.add_argument('--rows', type=int, default=20, help='number of rows to print (default: 20)')
+    args = parser.parse_args()
+    parse_xlsx(args.file, args.sheet, args.rows)

@@ -677,15 +677,11 @@ tr.dept-row td {
 
 .admin-settings-body {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 1fr;
   gap: 2rem;
   padding: 2rem;
   height: calc(100vh - 70px);
   overflow: hidden;
-}
-
-.admin-settings-sidebar {
-  overflow-y: auto;
 }
 
 .admin-settings-main {
@@ -697,13 +693,6 @@ tr.dept-row td {
   font-weight: 700;
   margin-bottom: 1rem;
   color: var(--text);
-}
-
-.supabase-config-card {
-  background: rgba(79, 70, 229, 0.08);
-  border: 1px solid var(--primary);
-  border-radius: 16px;
-  padding: 1.25rem;
 }
 
 .settings-label {

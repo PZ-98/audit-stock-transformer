@@ -1,16 +1,16 @@
 let groupedData = {};
-let selectedCategories = new Set(["Frame", "Lens", "Contactlens", "Accessories", "น้ำยา", "ไม่พบข้อมูลสินค้า"]);
+// Categories always included in preview and export (Service is intentionally excluded)
+const EXPORT_CATEGORIES = new Set(["Frame", "Lens", "Contactlens", "Accessories", "น้ำยา", "ไม่พบข้อมูลสินค้า"]);
 
 // Raw Stock State Variables (for re-processing upon scan file updates)
 let rawStockRows = null;
 let rawStockResult = null;
 let rawStockFileName = '';
 let rawStockFileSize = 0;
+let rawStockPeriod = { from: '', to: '' };
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
-const filterSection = document.getElementById('filterSection');
-const groupList = document.getElementById('groupList');
 const previewSection = document.getElementById('previewSection');
 const previewTableBody = document.querySelector('#previewTable tbody');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -28,8 +28,6 @@ const settingsSection = document.getElementById('settingsSection');
 const mappingList = document.getElementById('mappingList');
 const addMappingBtn = document.getElementById('addMappingBtn');
 const saveMappingBtn = document.getElementById('saveMappingBtn');
-const supabaseUrlInput = document.getElementById('supabaseUrl');
-const supabaseKeyInput = document.getElementById('supabaseKey');
 const importMappingBtn = document.getElementById('importMappingBtn');
 const mappingFileInput = document.getElementById('mappingFileInput');
 
@@ -37,12 +35,21 @@ let supabaseClient = null;
 let brandMappings = {};
 let activePreviewTab = 'All';
 
+// Escape text before inserting into innerHTML (data comes from uploaded files / database)
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // --- SUPABASE CONFIG (HARDCODED) ---
 const DEFAULT_SUPABASE_URL = 'https://qvuviyueajtchprbafbk.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2dXZpeXVlYWp0Y2hwcmJhZmJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDYwMjgsImV4cCI6MjA5MzQyMjAyOH0.JapT1lildN2H_9TeHF_iNiL3ABbT7NJewaf_wqeT0Cg';
 
 async function initSupabase() {
-    // Users will use hardcoded values, Admin can override via UI
     const url = DEFAULT_SUPABASE_URL;
     const key = DEFAULT_SUPABASE_KEY;
 
@@ -55,11 +62,26 @@ async function initSupabase() {
 // Initial Sync for all users (Background)
 initSupabase();
 
+// Fetch every row of brand_mappings (Supabase caps a single select at 1000 rows by default)
+async function fetchAllMappingRows(columns) {
+    const pageSize = 1000;
+    const allRows = [];
+    for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabaseClient
+            .from('brand_mappings')
+            .select(columns)
+            .order('id', { ascending: true })
+            .range(from, from + pageSize - 1);
+        if (error) throw error;
+        allRows.push(...(data || []));
+        if (!data || data.length < pageSize) return allRows;
+    }
+}
+
 async function syncMappings() {
     if (!supabaseClient) return;
     try {
-        const { data, error } = await supabaseClient.from('brand_mappings').select('*');
-        if (error) throw error;
+        const data = await fetchAllMappingRows('*');
 
         const newMappings = {};
         data.forEach(item => {
@@ -84,7 +106,10 @@ const TARGET_CATEGORIES = ["Frame", "Lens", "Contactlens", "Service", "Accessori
 
 // UI Events
 dropZone.onclick = () => fileInput.click();
-fileInput.onchange = (e) => handleFile(e.target.files[0]);
+fileInput.onchange = (e) => {
+    handleFile(e.target.files[0]);
+    e.target.value = ''; // Allow re-selecting the same file
+};
 
 dropZone.ondragover = (e) => {
     e.preventDefault();
@@ -146,12 +171,8 @@ loginBtn.onclick = async () => {
         passwordSection.style.display = 'none';
         settingsSection.style.display = 'block';
 
-        // Reveal credentials only to Admin
-        supabaseUrlInput.value = DEFAULT_SUPABASE_URL;
-        supabaseKeyInput.value = DEFAULT_SUPABASE_KEY;
-
-        await initSupabase();
-        await syncMappings(); // Force re-sync to be sure
+        if (supabaseClient) await syncMappings();
+        else await initSupabase();
         renderMappings();
         showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
     } else {
@@ -172,9 +193,9 @@ function addMappingRow(key = '', val = '') {
     const div = document.createElement('div');
     div.className = 'mapping-row';
     div.innerHTML = `
-        <input type="text" class="map-key settings-input" placeholder="Original (เช่น FMT หรือ 8851234567)" value="${key}">
+        <input type="text" class="map-key settings-input" placeholder="Original (เช่น FMT หรือ 8851234567)" value="${escapeHtml(key)}">
         <span style="text-align:center; color: var(--text-muted);">&#8594;</span>
-        <input type="text" class="map-val settings-input" placeholder="Replace with (เช่น Mykita)" value="${val}">
+        <input type="text" class="map-val settings-input" placeholder="Replace with (เช่น Mykita)" value="${escapeHtml(val)}">
         <button class="remove-mapping" title="ลบ">&times;</button>
     `;
     div.querySelector('.remove-mapping').onclick = () => div.remove();
@@ -204,32 +225,47 @@ mappingFileInput.onchange = (e) => {
 };
 
 saveMappingBtn.onclick = async () => {
-    if (!supabaseClient) {
-        // Fallback to init if user just pasted credentials
-        const url = supabaseUrlInput.value.trim();
-        const key = supabaseKeyInput.value.trim();
-        if (!url || !key) return alert('กรุณาระบุ Supabase URL และ Key ก่อนบันทึก!');
-        supabaseClient = supabase.createClient(url, key);
-        localStorage.setItem('supabaseUrl', url);
-        localStorage.setItem('supabaseKey', key);
-    }
+    if (!supabaseClient) return alert('ยังไม่สามารถเชื่อมต่อ Supabase ได้ กรุณารีเฟรชหน้าแล้วลองใหม่');
 
-    const rowsToSave = [];
+    // Collect rows, skipping duplicate keys (first one wins)
+    const rowsByKey = new Map();
+    const duplicateKeys = new Set();
     document.querySelectorAll('.mapping-row').forEach(row => {
         const key = row.querySelector('.map-key').value.trim();
         const val = row.querySelector('.map-val').value.trim();
-        if (key) rowsToSave.push({ original_name: key, replacement_name: val });
+        if (!key) return;
+        if (rowsByKey.has(key)) {
+            duplicateKeys.add(key);
+            return;
+        }
+        rowsByKey.set(key, { original_name: key, replacement_name: val });
     });
+    const rowsToSave = Array.from(rowsByKey.values());
+
+    if (duplicateKeys.size > 0 &&
+        !confirm(`พบค่าเดิม (Original) ซ้ำกัน ${duplicateKeys.size} รายการ:\n${Array.from(duplicateKeys).join(', ')}\n\nระบบจะบันทึกเฉพาะแถวแรกของแต่ละค่า ต้องการดำเนินการต่อหรือไม่?`)) {
+        return;
+    }
 
     try {
         saveMappingBtn.textContent = "⌛ กำลังบันทึก...";
         saveMappingBtn.disabled = true;
 
-        // Simple sync strategy: Clear and re-insert
-        await supabaseClient.from('brand_mappings').delete().neq('id', 0);
-        const { error } = await supabaseClient.from('brand_mappings').insert(rowsToSave);
+        // Insert new rows first, then delete old rows by id,
+        // so a failed insert never leaves the table empty.
+        const oldRows = await fetchAllMappingRows('id');
 
-        if (error) throw error;
+        if (rowsToSave.length > 0) {
+            const { error: insertError } = await supabaseClient.from('brand_mappings').insert(rowsToSave);
+            if (insertError) throw insertError;
+        }
+
+        // Delete in chunks to keep the request URL short
+        const oldIds = oldRows.map(row => row.id);
+        for (let i = 0; i < oldIds.length; i += 200) {
+            const { error: deleteError } = await supabaseClient.from('brand_mappings').delete().in('id', oldIds.slice(i, i + 200));
+            if (deleteError) throw deleteError;
+        }
 
         await syncMappings();
         alert('บันทึกข้อมูลลง Supabase เรียบร้อยแล้ว!');
@@ -326,7 +362,7 @@ function renderStatCard(category, count, container) {
     card.innerHTML = `
         <div class="stat-category-info">
             <span class="stat-color-dot" style="background-color: ${color}"></span>
-            <span class="stat-cat-name">${category}</span>
+            <span class="stat-cat-name">${escapeHtml(category)}</span>
         </div>
         <span class="stat-value">${count.toLocaleString()} ชิ้น</span>
     `;
@@ -356,9 +392,8 @@ function showUploadSuccessPopup(fileName, fileSize, patternType, dataGroup) {
     modal.style.display = 'flex';
     closeBtn.onclick = () => {
         modal.style.display = 'none';
-        const filterElement = document.getElementById('filterSection');
-        if (filterElement) {
-            filterElement.scrollIntoView({ behavior: 'smooth' });
+        if (previewSection.style.display !== 'none') {
+            previewSection.scrollIntoView({ behavior: 'smooth' });
         }
     };
 }
@@ -373,7 +408,7 @@ function renderUploadZoneActive(fileName) {
             <polyline points="14 2 14 8 20 8"></polyline>
         </svg>
         <p style="font-weight: 600; color: #10b981; margin-bottom: 0.5rem;">กำลังใช้งานไฟล์:</p>
-        <p id="activeFileName" style="font-weight: 700; color: var(--text-main); font-size: 1.1rem; margin-bottom: 1rem;" class="text-truncate">${fileName}</p>
+        <p id="activeFileName" style="font-weight: 700; color: var(--text-main); font-size: 1.1rem; margin-bottom: 1rem;" class="text-truncate">${escapeHtml(fileName)}</p>
         <button type="button" id="changeFileBtn" class="btn-secondary" style="display: inline-block; width: auto; padding: 0.5rem 1.5rem;">เปลี่ยนไฟล์</button>
     `;
     const btn = document.getElementById('changeFileBtn');
@@ -590,7 +625,7 @@ function showToast(message, type = 'info') {
         cursor: pointer;
     `;
     const lines = message.split('\n');
-    toast.innerHTML = `<strong style="font-size:1rem; display:block; margin-bottom:0.4rem;">${icon} ${lines[0]}</strong>${lines.slice(1).join('<br>')}`;
+    toast.innerHTML = `<strong style="font-size:1rem; display:block; margin-bottom:0.4rem;">${icon} ${escapeHtml(lines[0])}</strong>${lines.slice(1).map(escapeHtml).join('<br>')}`;
     toast.onclick = () => toast.remove();
     document.body.appendChild(toast);
 
@@ -604,11 +639,11 @@ function resetState() {
     rawStockResult = null;
     rawStockFileName = '';
     rawStockFileSize = 0;
+    rawStockPeriod = { from: '', to: '' };
     activePreviewTab = 'All';
     previewTabBar.innerHTML = '';
     previewTabBar.style.display = 'none';
     errorBanner.style.display = 'none';
-    filterSection.style.display = 'none';
     previewSection.style.display = 'none';
     previewTableBody.innerHTML = '';
     renderUploadZoneInactive();
@@ -623,7 +658,8 @@ function processLegacyRow(row, currentDeptState) {
         return;
     }
 
-    if (!currentDeptState.name || !row[3] || !row[0]) return;
+    // Empty category is allowed: CATEGORY_MAP maps '' to 'น้ำยา'
+    if (!currentDeptState.name || !row[3]) return;
 
     const rawCat = String(row[0] || '').trim();
     const cat = CATEGORY_MAP[rawCat] || rawCat;
@@ -639,10 +675,10 @@ function processLegacyRow(row, currentDeptState) {
 
     groupedData[finalDeptName].push({
         category: cat,
-        type: row[1],
+        type: String(row[1] ?? '').trim(),
         dept: finalDeptName,
         code: code,
-        description: row[4],
+        description: String(row[4] ?? '').trim(),
         balance: balance
     });
 }
@@ -687,11 +723,24 @@ function processFlatTableData(rows, result) {
     }
 }
 
+// Read the report period from the title rows,
+// e.g. "... จากวันที่ 01/09/2569 ถึงวันที่ 21/09/2569"
+function extractReportPeriod(rows) {
+    const periodPattern = /จากวันที่\s*(\d{1,2}\/\d{1,2}\/\d{4})\s*ถึงวันที่\s*(\d{1,2}\/\d{1,2}\/\d{4})/;
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        const text = (rows[i] || []).map(cell => String(cell ?? '')).join(' ');
+        const match = text.match(periodPattern);
+        if (match) return { from: match[1], to: match[2] };
+    }
+    return { from: '', to: '' };
+}
+
 function processRawData(rows, result, fileName, fileSize) {
     rawStockRows = rows;
     rawStockResult = result;
     rawStockFileName = fileName;
     rawStockFileSize = fileSize;
+    rawStockPeriod = extractReportPeriod(rows);
     rebuildGroupedData();
     showUploadSuccessPopup(fileName, fileSize, rawStockResult.type, groupedData);
 }
@@ -705,51 +754,8 @@ function rebuildGroupedData() {
     } else if (pattern === 'FLAT_TABLE') {
         processFlatTableData(rawStockRows, rawStockResult);
     }
-    renderFilters();
     updatePreview();
 }
-
-function renderFilters() {
-    groupList.innerHTML = '';
-    const activeFilterCategories = [...TARGET_CATEGORIES];
-    const hasUnmatched = Object.values(groupedData).some(items =>
-        items.some(item => item.category === 'ไม่พบข้อมูลสินค้า')
-    );
-    if (hasUnmatched) activeFilterCategories.push('ไม่พบข้อมูลสินค้า');
-
-    activeFilterCategories.forEach(cat => {
-        if (cat === 'Service') return; // Hide Service option
-        const div = document.createElement('div');
-        div.className = 'group-item';
-        div.innerHTML = `
-            <input type="checkbox" id="chk-${cat}" ${selectedCategories.has(cat) ? 'checked' : ''}>
-            <label for="chk-${cat}">${cat}</label>
-        `;
-        div.querySelector('input').onchange = (e) => {
-            if (e.target.checked) selectedCategories.add(cat);
-            else selectedCategories.delete(cat);
-            updatePreview();
-        };
-        groupList.appendChild(div);
-    });
-    filterSection.style.display = 'block';
-}
-
-document.getElementById('selectAll').onclick = () => {
-    document.querySelectorAll('.group-item input').forEach(i => {
-        i.checked = true;
-        selectedCategories.add(i.id.replace('chk-', ''));
-    });
-    updatePreview();
-};
-
-document.getElementById('deselectAll').onclick = () => {
-    document.querySelectorAll('.group-item input').forEach(i => {
-        i.checked = false;
-        selectedCategories.clear();
-    });
-    updatePreview();
-};
 
 function updatePreview() {
     previewTableBody.innerHTML = '';
@@ -769,7 +775,7 @@ function getCategoriesWithData() {
     const categories = new Set();
     Object.values(groupedData).forEach(items => {
         items.forEach(item => {
-            if (selectedCategories.has(item.category)) {
+            if (EXPORT_CATEGORIES.has(item.category)) {
                 categories.add(item.category);
             }
         });
@@ -792,7 +798,7 @@ function renderPreviewTabBar(activeCategories) {
 function renderAllTabButton() {
     const totalItemsCount = Object.values(groupedData).reduce((sum, items) => {
         return sum + items
-            .filter(item => selectedCategories.has(item.category))
+            .filter(item => EXPORT_CATEGORIES.has(item.category))
             .reduce((itemSum, item) => itemSum + item.balance, 0);
     }, 0);
     const allTab = document.createElement('div');
@@ -813,7 +819,7 @@ function renderCategoryTabButton(cat) {
     }, 0);
     const tab = document.createElement('div');
     tab.className = `preview-tab ${activePreviewTab === cat ? 'active' : ''}`;
-    tab.innerHTML = `${cat} <span class="count-badge">${catItemsCount}</span>`;
+    tab.innerHTML = `${escapeHtml(cat)} <span class="count-badge">${catItemsCount}</span>`;
     tab.onclick = () => {
         activePreviewTab = cat;
         updatePreview();
@@ -821,24 +827,26 @@ function renderCategoryTabButton(cat) {
     previewTabBar.appendChild(tab);
 }
 
+const PREVIEW_ROW_LIMIT = 100;
+
 function renderPreviewRows() {
     let rowCount = 0;
     Object.keys(groupedData).forEach(dept => {
         const filteredItems = groupedData[dept].filter(isItemInActiveTab);
         if (filteredItems.length === 0) return;
-        renderDeptHeaderRow(dept, filteredItems);
-        filteredItems.forEach(item => {
-            rowCount++;
-            if (rowCount > 100) return;
-            renderItemRow(item);
-        });
+        // Stop rendering (but keep counting) once the preview limit is reached
+        if (rowCount < PREVIEW_ROW_LIMIT) {
+            renderDeptHeaderRow(dept, filteredItems);
+            filteredItems.slice(0, PREVIEW_ROW_LIMIT - rowCount).forEach(renderItemRow);
+        }
+        rowCount += filteredItems.length;
     });
     return rowCount;
 }
 
 function isItemInActiveTab(item) {
     if (activePreviewTab === 'All') {
-        return selectedCategories.has(item.category);
+        return EXPORT_CATEGORIES.has(item.category);
     }
     return item.category === activePreviewTab;
 }
@@ -852,7 +860,7 @@ function renderDeptHeaderRow(dept, filteredItems) {
     const headerTr = document.createElement('tr');
     headerTr.className = 'dept-row';
     headerTr.innerHTML = `
-        <td colspan="5">Dept Name: ${dept}</td>
+        <td colspan="5">Dept Name: ${escapeHtml(dept)}</td>
         <td>${systemSubtotal.toLocaleString()}</td>
         <td>${actualText}</td>
         <td>${varianceText}</td>
@@ -867,11 +875,11 @@ function renderItemRow(item) {
     const varianceText = hasActual ? (item.actualCount - item.balance).toLocaleString() : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td>${item.category}</td>
-        <td>${item.type}</td>
-        <td>${item.dept}</td>
-        <td>${item.code}</td>
-        <td>${item.description}</td>
+        <td>${escapeHtml(item.category)}</td>
+        <td>${escapeHtml(item.type)}</td>
+        <td>${escapeHtml(item.dept)}</td>
+        <td>${escapeHtml(item.code)}</td>
+        <td>${escapeHtml(item.description)}</td>
         <td>${item.balance.toLocaleString()}</td>
         <td>${actualText}</td>
         <td>${varianceText}</td>
@@ -922,12 +930,13 @@ async function applySheetProtection(worksheet) {
 
 async function exportToExcel(branchCode) {
     const workbook = new ExcelJS.Workbook();
-    await createInstructionSheet(workbook);
-    await createScanSheet(workbook);
+    const activeCategories = getActiveExcelCategories();
 
-    const activeCategories = Array.from(selectedCategories).filter(cat => {
-        return Object.values(groupedData).some(items => items.some(item => item.category === cat));
-    });
+    await createInstructionSheet(workbook);
+    // The scan sheet looks up the 'Frame' sheet, so only create it when that sheet exists
+    if (activeCategories.includes('Frame')) {
+        await createScanSheet(workbook);
+    }
 
     for (const cat of activeCategories) {
         await createCategorySheet(workbook, cat, branchCode);
@@ -954,14 +963,17 @@ async function createInfoSheet(workbook, branchCode) {
 
     const downloadDate = formatThaiDate(new Date());
     infoSheet.addRow({ property: 'Branch Code', value: branchCode || '' });
-    infoSheet.addRow({ property: 'Download Date', value: downloadDate });
+    infoSheet.addRow({ property: 'Convert Date', value: downloadDate });
+    infoSheet.addRow({ property: 'From Date', value: rawStockPeriod.from });
+    infoSheet.addRow({ property: 'To Date', value: rawStockPeriod.to });
     await applySheetProtection(infoSheet);
 }
 
 async function createScanSheet(workbook) {
-    const scanSheet = workbook.addWorksheet('สแกน', { properties: { tabColor: { argb: '#5c5c5c' } } });
+    const scanSheet = workbook.addWorksheet('สแกน', { properties: { tabColor: { argb: 'FF5C5C5C' } } });
+    // Column A is Text so scanned barcodes keep leading zeros and digits beyond 15
     scanSheet.columns = [
-        { header: 'รายการสแกน (Barcode)', key: 'barcode', width: 25 },
+        { header: 'รายการสแกน (Barcode)', key: 'barcode', width: 25, style: { numFmt: '@' } },
         { header: 'สถานะ / รายละเอียดสินค้า', key: 'status', width: 45 }
     ];
     const headerRow = scanSheet.getRow(1);
@@ -973,8 +985,10 @@ async function createScanSheet(workbook) {
 
     for (let r = 2; r <= 5000; r++) {
         const row = scanSheet.getRow(r);
+        row.getCell(1).numFmt = '@';
         row.getCell(1).protection = { locked: false };
-        row.getCell(2).value = { formula: `IF(A${r}="","",IFERROR(VLOOKUP(A${r},'Frame'!D:E,2,FALSE),"ไม่พบข้อมูล"))` };
+        // A&"" forces a text lookup, since Frame codes are stored as text
+        row.getCell(2).value = { formula: `IF(A${r}="","",IFERROR(VLOOKUP(A${r}&"",'Frame'!D:E,2,FALSE),"ไม่พบข้อมูล"))` };
     }
     await applySheetProtection(scanSheet);
 }
@@ -1200,7 +1214,14 @@ if (branchCodeModal) {
     submitBranchBtn.onclick = async () => {
         const branchCode = branchInput.value.trim().toUpperCase();
         branchCodeModal.style.display = 'none';
-        const isSaved = await exportToExcel(branchCode);
+        let isSaved = false;
+        try {
+            isSaved = await exportToExcel(branchCode);
+        } catch (err) {
+            console.error(err);
+            showToast(`สร้างไฟล์ Excel ไม่สำเร็จ\n${err.message || err}`, 'error');
+            return;
+        }
         if (!isSaved) return;
         
         if (downloadCompleteModal) {
@@ -1228,7 +1249,7 @@ if (downloadCompleteModal && downloadCompleteOkBtn) {
 }
 
 function getActiveExcelCategories() {
-    return Array.from(selectedCategories).filter(category => {
+    return Array.from(EXPORT_CATEGORIES).filter(category => {
         return Object.values(groupedData).some(items => 
             items.some(item => item.category === category)
         );
@@ -1246,8 +1267,8 @@ function renderPdfGroupOptions() {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'pdf-group-item';
         itemDiv.innerHTML = `
-            <input type="checkbox" id="pdf-chk-${category}" data-category="${category}" checked>
-            <label for="pdf-chk-${category}">${category}</label>
+            <input type="checkbox" id="pdf-chk-${escapeHtml(category)}" data-category="${escapeHtml(category)}" checked>
+            <label for="pdf-chk-${escapeHtml(category)}">${escapeHtml(category)}</label>
         `;
         pdfGroupList.appendChild(itemDiv);
     });
@@ -1303,7 +1324,7 @@ function generatePrintHeader(branchCode) {
             <div class="print-logo">VISION VENTURES</div>
             <div class="print-title">รายงานผลการตรวจนับสต็อกสินค้า (Audit Stock Report)</div>
             <div class="print-meta">
-                <div><strong>สาขา (Branch):</strong> ${branchCode}</div>
+                <div><strong>สาขา (Branch):</strong> ${escapeHtml(branchCode)}</div>
                 <div><strong>วันที่พิมพ์ (Date):</strong> ${printDate}</div>
             </div>
         </div>
@@ -1336,7 +1357,7 @@ function generatePrintDeptRows(deptName, items) {
 
     let rowsHtml = `
         <tr class="print-dept-header">
-            <td colspan="2">Dept Name: ${deptName}</td>
+            <td colspan="2">Dept Name: ${escapeHtml(deptName)}</td>
             <td style="text-align: right;">${sysSum.toLocaleString()}</td>
             <td style="text-align: right;">${actText}</td>
             <td style="text-align: right;">${varText}</td>
@@ -1350,8 +1371,8 @@ function generatePrintDeptRows(deptName, items) {
         const itemVarText = itemAct ? (item.actualCount - item.balance).toLocaleString() : '';
         rowsHtml += `
             <tr>
-                <td>${item.code}</td>
-                <td>${item.description}</td>
+                <td>${escapeHtml(item.code)}</td>
+                <td>${escapeHtml(item.description)}</td>
                 <td style="text-align: right;">${item.balance.toLocaleString()}</td>
                 <td style="text-align: right;">${itemActText}</td>
                 <td style="text-align: right;">${itemVarText}</td>
@@ -1366,7 +1387,7 @@ function generatePrintDeptRows(deptName, items) {
 function generatePrintCategorySection(category) {
     let sectionHtml = `
         <div class="print-category-section">
-            <h3 class="print-category-title">หมวดหมู่สินค้า: ${category}</h3>
+            <h3 class="print-category-title">หมวดหมู่สินค้า: ${escapeHtml(category)}</h3>
             <table class="print-table">
                 <thead>
                     <tr>
