@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit Stock Transformer | Vision Ventures</title>
-    <link rel="stylesheet" href="style.css?v=2.0.7">
+    <link rel="stylesheet" href="style.css?v=2.0.8">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,9 +22,86 @@
 </head>
 
 <body>
-    <div class="container fade-in">
+    <!-- Apply the view before first paint so #convert links don't flash the cover (see syncViewWithHash in app.js) -->
+    <script>if (location.hash === '#convert') document.body.classList.add('view-convert');</script>
+
+    <!-- Cover: choose between converting a file and reporting audit results -->
+    <section id="coverView" class="cover fade-in">
+        <div class="cover-panel">
+            <header class="cover-header">
+                <div class="cover-brand">VISION VENTURES</div>
+                <h1 class="cover-title">ระบบตรวจนับ Stock รายเดือนของสาขา</h1>
+            </header>
+
+            <div class="cover-body">
+                <p class="cover-prompt">กรุณาเลือกรายการที่ต้องการ</p>
+
+                <nav class="cover-menu">
+                    <a href="#convert" class="cover-menu-item">
+                        <span class="cover-menu-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+                                <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                                <path d="M8 13h2"></path>
+                                <path d="M14 13h2"></path>
+                                <path d="M8 17h2"></path>
+                                <path d="M14 17h2"></path>
+                            </svg>
+                        </span>
+                        <span class="cover-menu-text">
+                            <span class="cover-menu-title">แปลงไฟล์สำหรับตรวจสอบสาขา</span>
+                            <span class="cover-menu-desc">อัปโหลดไฟล์สต็อกจากโปรแกรม Inventory
+                                เพื่อสร้างไฟล์ตรวจนับ</span>
+                        </span>
+                        <svg class="cover-menu-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </a>
+
+                    <a href="https://sites.google.com/view/vision-stock/%E0%B8%9F%E0%B8%AD%E0%B8%A3%E0%B8%A1%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%9C%E0%B8%A5%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88-stock"
+                        target="_blank" rel="noopener noreferrer" class="cover-menu-item">
+                        <span class="cover-menu-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                <path d="m9 14 2 2 4-4"></path>
+                            </svg>
+                        </span>
+                        <span class="cover-menu-text">
+                            <span class="cover-menu-title">ส่งผลการตรวจสอบ</span>
+                            <span class="cover-menu-desc">ส่งผลการตรวจนับสต็อกผ่านแบบฟอร์มรายงาน</span>
+                        </span>
+                        <svg class="cover-menu-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M7 17 17 7"></path>
+                            <path d="M7 7h10v10"></path>
+                        </svg>
+                    </a>
+                </nav>
+            </div>
+
+            <footer class="cover-footer">
+                สงสัยเพิ่มเติมติดต่อ <a href="https://line.me/ti/p/ph7H35svrL" target="_blank"
+                    rel="noopener noreferrer">Audit Fluke</a>
+            </footer>
+        </div>
+    </section>
+
+    <div id="converterView" class="container fade-in">
         <!-- Logo Section -->
         <div class="logo-card">
+            <a href="#" class="back-home-btn" title="กลับหน้าหลัก">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span>หน้าหลัก</span>
+            </a>
             <div class="logo-container">
                 <div class="logo-placeholder">VISION VENTURES</div>
                 <div class="app-title">ฟอร์มแปลงไฟล์สำหรับ Audit สาขา Version 3.1</div>
@@ -124,17 +201,6 @@
             </svg>
             <span>เลื่อนไปล่างสุด</span>
         </button>
-
-        <a href="https://sites.google.com/view/vision-stock/%E0%B8%9F%E0%B8%AD%E0%B8%A3%E0%B8%A1%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%87%E0%B8%B2%E0%B8%99%E0%B8%9C%E0%B8%A5%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88-stock"
-            target="_blank" rel="noopener noreferrer" class="fap-btn fap-btn-report">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                <path d="m9 14 2 2 4-4"></path>
-            </svg>
-            <span>รายงานผลการตรวจสอบ</span>
-        </a>
 
         <a href="https://docs.google.com/presentation/d/1aFN2XWkhm4UpB03h2quhXMDX8xl83FqM781FNrY7nwc/edit?usp=sharing"
             target="_blank" rel="noopener noreferrer" class="fap-btn">
@@ -396,7 +462,7 @@
     <!-- Hidden Print Area for PDF Generation -->
     <div id="printArea" class="print-only"></div>
 
-    <script src="app.js?v=2.0.7"></script>
+    <script src="app.js?v=2.0.8"></script>
 </body>
 
 </html>

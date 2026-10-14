@@ -1489,3 +1489,13 @@ function initDateNoticeModal() {
 }
 
 initDateNoticeModal();
+
+// --- Cover / Converter View Switching ---
+// The URL hash picks the view so the browser Back button returns to the cover.
+function syncViewWithHash() {
+    document.body.classList.toggle('view-convert', location.hash === '#convert');
+    window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', syncViewWithHash);
+syncViewWithHash();
